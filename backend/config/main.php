@@ -12,26 +12,26 @@ return [
     'basePath' => dirname(__DIR__),
     'controllerNamespace' => 'backend\controllers',
     'bootstrap' => ['log'],
+    'defaultRoute' => 'dashboard/index',
     'modules' => [],
     'components' => [
         'request' => [
             'csrfParam' => '_csrf-backend',
             'csrfCookie' => [
                 'httpOnly' => true,
-		'path' => '/admin'
-	    ],
+                'path' => '/',
+            ],
         ],
         'user' => [
             'identityClass' => \common\models\User::class,
             'enableAutoLogin' => true,
-            'identityCookie' => ['name' => '_identity-backend', 'path' => '/admin', 'httpOnly' => true,],
+            'identityCookie' => ['name' => '_identity-backend', 'path' => '/', 'httpOnly' => true],
         ],
         'session' => [
-            // this is the name of the session cookie used for login on the backend
             'name' => 'advanced-backend',
-	    'cookieParams' => [
-	    	'path' => '/admin',
-	    ],
+            'cookieParams' => [
+                'path' => '/',
+            ],
         ],
         'log' => [
             'traceLevel' => YII_DEBUG ? 3 : 0,

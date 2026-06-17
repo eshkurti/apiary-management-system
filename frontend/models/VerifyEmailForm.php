@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace frontend\models;
 
 use common\models\User;
+use Yii;
 use yii\base\InvalidArgumentException;
 use yii\base\Model;
 
@@ -44,6 +45,19 @@ class VerifyEmailForm extends Model
 
         $user->status = User::STATUS_ACTIVE;
 
-        return $user->save(false) ? $user : null;
+        if (!$user->save(false)) {
+            return null;
+        }
+
+        // Activate the account with the customer role so it can shop (AC-EC-02.5).
+        $auth = Yii::$app->authManager;
+        if ($auth !== null) {
+            $role = $auth->getRole('customer');
+            if ($role !== null && $auth->getAssignment('customer', $user->id) === null) {
+                $auth->assign($role, $user->id);
+            }
+        }
+
+        return $user;
     }
 }

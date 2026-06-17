@@ -1,0 +1,134 @@
+/* ============================================================
+   Honigmanufaktur Lindenhof — Public Shop
+   Warm honey aesthetic: amber primary, off-white background,
+   dark text. Explicit colours so the shop stays warm/light
+   regardless of the OS colour-scheme.
+   ============================================================ */
+
+:root {
+    --honey-amber:        #f4b400;
+    --honey-amber-dark:   #dca000;
+    --honey-amber-darker: #bd8800;
+    --honey-bg:           #fbf8f1;
+    --honey-surface:      #ffffff;
+    --honey-text:         #2b2620;
+    --honey-text-muted:   #6e655a;
+    --honey-border:       #ece5d6;
+    --honey-dark:         #2a2118;
+    --honey-shadow:       0 1px 2px rgba(60, 44, 12, .05), 0 2px 8px rgba(60, 44, 12, .06);
+}
+
+html, body { color-scheme: light; }
+body {
+    background: var(--honey-bg);
+    color: var(--honey-text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+a { color: var(--honey-amber-darker); }
+a:hover { color: var(--honey-amber-dark); }
+
+/* ── Navbar ─────────────────────────────────────────────────── */
+.shop-navbar {
+    background: var(--honey-surface);
+    border-bottom: 1px solid var(--honey-border);
+    box-shadow: 0 1px 3px rgba(60, 44, 12, .04);
+}
+.shop-brand {
+    font-weight: 800; font-size: 1.2rem; color: var(--honey-dark); text-decoration: none;
+    display: inline-flex; align-items: center; gap: .5rem; letter-spacing: -.01em;
+}
+.shop-brand .brand-mark { font-size: 1.4rem; }
+.shop-brand small { display: block; font-size: .64rem; font-weight: 500; color: var(--honey-amber-darker); letter-spacing: .08em; text-transform: uppercase; }
+.shop-nav-link { color: var(--honey-text); text-decoration: none; font-weight: 500; padding: .4rem .75rem; border-radius: .4rem; }
+.shop-nav-link:hover { color: var(--honey-dark); background: #f5efe2; }
+.cart-badge {
+    background: var(--honey-amber); color: var(--honey-dark); font-weight: 700;
+    font-size: .7rem; border-radius: 999px; padding: .1rem .45rem; margin-left: .2rem;
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.btn-honey {
+    background: var(--honey-amber); border: 1px solid var(--honey-amber);
+    color: var(--honey-dark); font-weight: 600;
+}
+.btn-honey:hover { background: var(--honey-amber-dark); border-color: var(--honey-amber-dark); color: var(--honey-dark); }
+.btn-honey:active, .btn-honey:focus { background: var(--honey-amber-darker); border-color: var(--honey-amber-darker); color: var(--honey-dark); box-shadow: 0 0 0 .2rem rgba(244, 180, 0, .3); }
+.btn-outline-honey { border: 1px solid var(--honey-amber-dark); color: var(--honey-amber-darker); background: transparent; font-weight: 600; }
+.btn-outline-honey:hover { background: var(--honey-amber); border-color: var(--honey-amber); color: var(--honey-dark); }
+
+/* ── Cards & surfaces ───────────────────────────────────────── */
+.card { background: var(--honey-surface); color: var(--honey-text); border: 1px solid var(--honey-border); border-radius: .7rem; box-shadow: var(--honey-shadow); }
+.card-header { background: var(--honey-surface); border-bottom: 1px solid var(--honey-border); font-weight: 600; }
+
+/* Product grid card */
+.product-card { transition: transform .12s, box-shadow .12s, border-color .12s; height: 100%; text-decoration: none; color: inherit; display: block; }
+.product-card:hover { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(60, 44, 12, .12); border-color: var(--honey-amber); color: inherit; }
+.product-thumb {
+    height: 150px; border-radius: .6rem .6rem 0 0;
+    background: linear-gradient(135deg, #ffe9a8 0%, #f4b400 60%, #dca000 100%);
+    display: flex; align-items: center; justify-content: center; font-size: 3rem;
+}
+.product-card .lot-chip {
+    display: inline-block; font-size: .7rem; font-weight: 600; letter-spacing: .02em;
+    background: #f5efe2; color: var(--honey-text-muted); border-radius: .35rem; padding: .12rem .45rem;
+}
+.price-tag { font-size: 1.25rem; font-weight: 700; color: var(--honey-dark); }
+
+/* Traceability panel */
+.trace-panel { background: #fdfaf2; border: 1px solid var(--honey-border); border-radius: .6rem; }
+.trace-panel dt { color: var(--honey-text-muted); font-weight: 600; font-size: .82rem; }
+.trace-panel dd { color: var(--honey-text); margin-bottom: .6rem; }
+
+/* ── Forms ──────────────────────────────────────────────────── */
+label, .form-label { color: var(--honey-text); font-weight: 500; }
+.form-control, .form-select { background: var(--honey-surface); color: var(--honey-text); border: 1px solid #d9d0bf; border-radius: .45rem; }
+.form-control::placeholder { color: #a99f8e; }
+.form-control:focus, .form-select:focus { border-color: var(--honey-amber); box-shadow: 0 0 0 .2rem rgba(244, 180, 0, .22); }
+
+/* ── Tables ─────────────────────────────────────────────────── */
+.table { color: var(--honey-text); --bs-table-bg: var(--honey-surface); --bs-table-striped-bg: #fbf7ee; }
+.table > thead > tr > th { color: var(--honey-text-muted); text-transform: uppercase; font-size: .76rem; letter-spacing: .03em; border-bottom: 2px solid var(--honey-border); }
+
+/* ── Status badges (order fulfilment) ───────────────────────── */
+.status-badge { display: inline-block; padding: .32em .6em; font-size: .72rem; font-weight: 600; border-radius: .35rem; border: 1px solid transparent; line-height: 1; }
+.status-badge.status-received  { background: #e7f0ff; color: #0a58ca; border-color: #cfe0ff; }
+.status-badge.status-packed    { background: #fdf0c9; color: #8a6500; border-color: #f6e3a4; }
+.status-badge.status-shipped   { background: #ece3fb; color: #6f42c1; border-color: #ddccf6; }
+.status-badge.status-delivered { background: #d9f2e3; color: #0f7a45; border-color: #bfe8cf; }
+.status-badge.status-cancelled { background: #ecedef; color: #5c6672; border-color: #dfe1e4; }
+
+/* ── Hero ───────────────────────────────────────────────────── */
+.shop-hero {
+    background: linear-gradient(135deg, #fff4d1 0%, #f7c948 55%, #e8a200 100%);
+    border-radius: 1rem; color: var(--honey-dark); position: relative; overflow: hidden;
+}
+.shop-hero h1 { font-weight: 800; letter-spacing: -.02em; }
+
+/* ── Footer ─────────────────────────────────────────────────── */
+.shop-footer { background: var(--honey-dark); color: #e7ddc9; }
+.shop-footer a { color: var(--honey-amber); }
+.shop-footer .tagline { color: #b9ad95; font-size: .9rem; }
+
+/* sold-out / low stock */
+.text-soldout { color: #b42318; font-weight: 600; }
+
+/* ── Order stage tracker ────────────────────────────────────── */
+.order-tracker { display: flex; align-items: flex-start; }
+.order-tracker .stage { flex: 1 1 0; text-align: center; position: relative; }
+.order-tracker .dot {
+    width: 3rem; height: 3rem; border-radius: 50%; display: inline-flex;
+    align-items: center; justify-content: center; font-size: 1.35rem; font-weight: 700;
+    border: 2px solid; position: relative; z-index: 1; background: #fff;
+}
+/* connector line between dots */
+.order-tracker .stage:not(:last-child)::after {
+    content: ''; position: absolute; top: 1.5rem; left: 50%; width: 100%;
+    height: 3px; background: #e4dcca; z-index: 0;
+}
+.order-tracker .stage.done:not(:last-child)::after { background: var(--honey-amber); }
+.order-tracker .stage.done .dot { background: var(--honey-amber); border-color: var(--honey-amber-dark); color: var(--honey-dark); }
+.order-tracker .stage.todo .dot { background: #fff; border-color: #d9d0bf; color: #a99f8e; }
+.order-tracker .stage .label { margin-top: .6rem; font-weight: 600; font-size: .92rem; }
+.order-tracker .stage.done .label { color: var(--honey-dark); }
+.order-tracker .stage.todo .label { color: var(--honey-text-muted); }

@@ -1,0 +1,204 @@
+/* ============================================================
+   Honigmanufaktur Lindenhof — Backend Admin Design System
+   Dark sidebar + light, off-white content. Brand amber primary.
+   Scoped to #lin-content / #lin-sidebar so the login (blank layout)
+   is unaffected.
+   ============================================================ */
+
+:root {
+    --lin-amber:        #f4b400;
+    --lin-amber-dark:   #dca000;
+    --lin-amber-darker: #bd8800;
+    --lin-amber-soft:   rgba(244, 180, 0, .14);
+
+    --lin-sidebar-bg:    #1f2733;
+    --lin-sidebar-text:  #c7ced8;
+    --lin-sidebar-muted: #6b7585;
+
+    --lin-content-bg: #f8f7f4;
+    --lin-surface:    #ffffff;
+    --lin-text:       #1f2733;
+    --lin-text-muted: #5c6672;
+    --lin-border:     #e6e4dd;
+    --lin-shadow:     0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .07);
+}
+
+/* ── Shell ──────────────────────────────────────────────────── */
+body {
+    background: var(--lin-content-bg);
+    color: var(--lin-text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ── Sidebar (dark, fixed) ──────────────────────────────────── */
+#lin-sidebar {
+    width: 250px; min-height: 100vh; position: fixed; top: 0; left: 0;
+    background: var(--lin-sidebar-bg); color: var(--lin-sidebar-text); overflow-y: auto;
+}
+#lin-sidebar .brand {
+    padding: 1.1rem 1.25rem; font-weight: 700; color: #fff; font-size: 1.05rem;
+    border-bottom: 1px solid rgba(255, 255, 255, .08); display: block; text-decoration: none;
+}
+#lin-sidebar .brand small {
+    display: block; font-weight: 400; color: var(--lin-amber);
+    font-size: .72rem; letter-spacing: .04em;
+}
+#lin-sidebar .nav-section {
+    padding: .9rem 1.25rem .35rem; font-size: .68rem; text-transform: uppercase;
+    letter-spacing: .09em; color: var(--lin-sidebar-muted); font-weight: 700;
+}
+#lin-sidebar .sidebar-link {
+    color: var(--lin-sidebar-text); padding: .5rem 1.25rem; font-size: .9rem; display: block;
+    border-left: 3px solid transparent; text-decoration: none;
+    transition: background-color .12s ease, color .12s ease;
+}
+#lin-sidebar .sidebar-link:hover { background: rgba(255, 255, 255, .05); color: #fff; }
+#lin-sidebar .sidebar-link.active {
+    background: var(--lin-amber-soft); color: #fff; border-left-color: var(--lin-amber);
+}
+#lin-sidebar .sidebar-icon { display: inline-block; width: 1.3rem; opacity: .85; }
+.muted-soon { opacity: .5; cursor: default; }
+
+/* ── Content area (light scope) ─────────────────────────────── */
+/* color-scheme: light is critical — it stops the OS/Bootstrap dark
+   color-scheme from cascading into native date pickers and hiding
+   the calendar icon. */
+#lin-content {
+    margin-left: 250px; background: var(--lin-content-bg); color: var(--lin-text);
+    min-height: 100vh; color-scheme: light;
+}
+#lin-topbar { background: var(--lin-surface); border-bottom: 1px solid var(--lin-border); padding: .6rem 1.5rem; }
+#lin-content footer { background: var(--lin-surface) !important; }
+
+/* ── Typography ─────────────────────────────────────────────── */
+#lin-content h1, #lin-content h2, #lin-content h3,
+#lin-content h4, #lin-content h5, #lin-content h6 {
+    color: var(--lin-text); font-weight: 600; letter-spacing: -.01em;
+}
+#lin-content .text-muted { color: var(--lin-text-muted) !important; }
+
+/* ── Cards: white, subtle border, gentle shadow ─────────────── */
+#lin-content .card {
+    background: var(--lin-surface); color: var(--lin-text);
+    border: 1px solid var(--lin-border); border-radius: .6rem; box-shadow: var(--lin-shadow);
+}
+#lin-content .card-header {
+    background: var(--lin-surface); color: var(--lin-text);
+    border-bottom: 1px solid var(--lin-border); font-weight: 600;
+}
+#lin-content .list-group-item { background: var(--lin-surface); color: var(--lin-text); border-color: var(--lin-border); }
+
+/* ── Forms ──────────────────────────────────────────────────── */
+#lin-content label,
+#lin-content .form-label,
+#lin-content .col-form-label,
+#lin-content .form-check-label { color: var(--lin-text); font-weight: 500; }
+
+#lin-content .form-control,
+#lin-content .form-select {
+    background-color: var(--lin-surface); color: var(--lin-text);
+    border: 1px solid #cfd4da; border-radius: .45rem;
+}
+#lin-content .form-control::placeholder { color: #9aa2ad; opacity: 1; }
+#lin-content .form-control:focus,
+#lin-content .form-select:focus {
+    background-color: var(--lin-surface); color: var(--lin-text);
+    border-color: var(--lin-amber); box-shadow: 0 0 0 .2rem rgba(244, 180, 0, .22);
+}
+#lin-content .form-text,
+#lin-content .hint-block { color: var(--lin-text-muted); }
+#lin-content .form-check-input:checked { background-color: var(--lin-amber); border-color: var(--lin-amber); }
+#lin-content .form-check-input:focus { border-color: var(--lin-amber); box-shadow: 0 0 0 .2rem rgba(244, 180, 0, .22); }
+
+/* Native date / time inputs — force light scheme so the calendar icon
+   and text are dark and clearly visible on the white field. */
+#lin-content input[type="date"],
+#lin-content input[type="datetime-local"],
+#lin-content input[type="time"],
+#lin-content input[type="month"] {
+    color-scheme: light; color: var(--lin-text); background-color: var(--lin-surface);
+}
+#lin-content input[type="date"]::-webkit-calendar-picker-indicator,
+#lin-content input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+#lin-content input[type="time"]::-webkit-calendar-picker-indicator,
+#lin-content input[type="month"]::-webkit-calendar-picker-indicator {
+    opacity: .85; cursor: pointer;
+}
+#lin-content input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+
+/* ── Buttons: amber primary (brand) ─────────────────────────── */
+#lin-content .btn-warning,
+#lin-content .btn-primary {
+    --bs-btn-bg: var(--lin-amber);
+    --bs-btn-border-color: var(--lin-amber);
+    --bs-btn-color: #1f2733;
+    --bs-btn-hover-bg: var(--lin-amber-dark);
+    --bs-btn-hover-border-color: var(--lin-amber-dark);
+    --bs-btn-hover-color: #1f2733;
+    --bs-btn-active-bg: var(--lin-amber-darker);
+    --bs-btn-active-border-color: var(--lin-amber-darker);
+    --bs-btn-active-color: #1f2733;
+    --bs-btn-disabled-bg: var(--lin-amber);
+    --bs-btn-disabled-border-color: var(--lin-amber);
+    --bs-btn-disabled-color: #1f2733;
+    --bs-btn-focus-shadow-rgb: 244, 180, 0;
+    font-weight: 600;
+}
+#lin-content .btn-outline-secondary {
+    --bs-btn-color: var(--lin-text);
+    --bs-btn-border-color: #cfd4da;
+    --bs-btn-hover-bg: #f1efe9;
+    --bs-btn-hover-border-color: #b9bec6;
+    --bs-btn-hover-color: var(--lin-text);
+    --bs-btn-active-bg: #e9e6dd;
+    --bs-btn-active-color: var(--lin-text);
+}
+
+/* ── Tables: subtle striping, clean header ──────────────────── */
+#lin-content .table {
+    color: var(--lin-text);
+    --bs-table-color: var(--lin-text);
+    --bs-table-bg: var(--lin-surface);
+    --bs-table-striped-color: var(--lin-text);
+    --bs-table-striped-bg: #faf9f6;
+    --bs-table-hover-color: var(--lin-text);
+    --bs-table-hover-bg: #f4efe1;
+    border-color: var(--lin-border);
+    margin-bottom: 0;
+}
+#lin-content .table > thead > tr > th {
+    background: var(--lin-surface); color: var(--lin-text-muted);
+    font-size: .78rem; text-transform: uppercase; letter-spacing: .03em;
+    font-weight: 600; border-bottom: 2px solid var(--lin-border); white-space: nowrap;
+}
+#lin-content .table > thead > tr > th a { color: var(--lin-text-muted); text-decoration: none; }
+#lin-content .table > thead > tr > th a:hover { color: var(--lin-text); }
+#lin-content .table > :not(caption) > * > * { color: var(--lin-text); }
+
+/* GridView chrome */
+#lin-content .grid-view .summary { color: var(--lin-text-muted); font-size: .85rem; margin-bottom: .5rem; }
+#lin-content .pagination { --bs-pagination-color: var(--lin-text); --bs-pagination-active-bg: var(--lin-amber); --bs-pagination-active-border-color: var(--lin-amber); --bs-pagination-active-color: #1f2733; }
+
+/* DetailView */
+#lin-content dt, #lin-content dd { color: var(--lin-text); }
+#lin-content .table.detail-view th { background: #faf9f6; color: var(--lin-text-muted); font-weight: 600; width: 38%; }
+
+/* Content links (not buttons/nav/badges) */
+#lin-content a:not(.btn):not(.nav-link):not(.lin-badge) { color: #b07d00; text-decoration: none; }
+#lin-content a:not(.btn):not(.nav-link):not(.lin-badge):hover { color: #8a6200; text-decoration: underline; }
+
+/* ── Status badges — single consistent colour system ────────── */
+.lin-badge {
+    display: inline-block; padding: .34em .6em; font-size: .72rem; font-weight: 600;
+    line-height: 1; border-radius: .35rem; letter-spacing: .01em; white-space: nowrap;
+    vertical-align: middle; border: 1px solid transparent;
+}
+.lin-badge--received        { background: #e7f0ff; color: #0a58ca; border-color: #cfe0ff; } /* blue   */
+.lin-badge--packed          { background: #fdf0c9; color: #8a6500; border-color: #f6e3a4; } /* amber  */
+.lin-badge--shipped         { background: #ece3fb; color: #6f42c1; border-color: #ddccf6; } /* purple */
+.lin-badge--delivered,
+.lin-badge--released         { background: #d9f2e3; color: #0f7a45; border-color: #bfe8cf; } /* green */
+.lin-badge--pending_release { background: #fdf0c9; color: #8a6500; border-color: #f6e3a4; } /* amber  */
+.lin-badge--review_required { background: #fde2e1; color: #b42318; border-color: #f6c9c6; } /* red    */
+.lin-badge--cancelled,
+.lin-badge--default          { background: #ecedef; color: #5c6672; border-color: #dfe1e4; } /* grey  */
