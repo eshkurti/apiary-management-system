@@ -64,7 +64,28 @@ class Inspection extends ActiveRecord
             [['notes'], 'string'],
             [['colony_id'], 'exist', 'targetClass' => Colony::class, 'targetAttribute' => 'id'],
             [['apiary_stand_id'], 'exist', 'targetClass' => ApiaryStand::class, 'targetAttribute' => 'id'],
+
+            // The inspection's stand must match the colony's current stand.
+            [['colony_id'], 'validateColonyStand'],
         ];
+    }
+
+    /**
+     * Ensures the selected colony is actually assigned to the selected stand.
+     * Guards against tampering with the dependent colony dropdown (Fix 2).
+     */
+    public function validateColonyStand(string $attribute): void
+    {
+        if (empty($this->colony_id) || empty($this->apiary_stand_id)) {
+            return;
+        }
+        $colony = Colony::findOne($this->colony_id);
+        if ($colony !== null && (int) $colony->apiary_stand_id !== (int) $this->apiary_stand_id) {
+            $this->addError(
+                $attribute,
+                'The selected colony is not assigned to the selected apiary stand.',
+            );
+        }
     }
 
     public function attributeLabels(): array

@@ -29,6 +29,9 @@ use yii\db\ActiveRecord;
  */
 class Customer extends ActiveRecord
 {
+    /** Checkout requires a complete delivery address (AC-EC-03.2). */
+    public const SCENARIO_CHECKOUT = 'checkout';
+
     public static function tableName(): string
     {
         return '{{%customer}}';
@@ -53,6 +56,9 @@ class Customer extends ActiveRecord
             [['min_order_quantity'], 'integer', 'min' => 1],
             [['min_order_quantity'], 'required', 'when' => fn($m) => $m->is_wholesale,
                 'message' => 'Minimum order quantity is required for wholesale accounts.'],
+
+            // A confirmed delivery address is mandatory at checkout (AC-EC-03.2).
+            [['address', 'postcode', 'city'], 'required', 'on' => self::SCENARIO_CHECKOUT],
         ];
     }
 

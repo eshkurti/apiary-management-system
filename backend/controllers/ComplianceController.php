@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace backend\controllers;
 
+use backend\services\PdfExportService;
 use common\models\ApiaryStand;
 use common\models\Batch;
 use common\models\Colony;
@@ -59,7 +60,7 @@ class ComplianceController extends Controller
                     ],
                     [
                         'allow' => true,
-                        'actions' => ['stockkarte'],
+                        'actions' => ['stockkarte', 'colonies-for-stand'],
                         'roles' => ['exportStockkarte'],
                     ],
                     [
@@ -79,16 +80,31 @@ class ComplianceController extends Controller
     // ── Release gate (US-CO-01, US-CO-02) ─────────────────────────────────
 
     /**
-     * Lists every batch with its current status (US-CO-01).
+     * Compliance worklist (US-CO-01): only batches that need attention —
+     * Pending Release (needs evaluation/release) and Review Required (needs
+     * re-evaluation/re-release). Released batches are settled and are not listed
+     * here; their gate can still be opened directly via actionGate.
      */
     public function actionReleaseGate(): string
     {
+        $needsAttention = [Batch::STATUS_PENDING_RELEASE, Batch::STATUS_REVIEW_REQUIRED];
+
         $dataProvider = new ActiveDataProvider([
-            'query' => Batch::find()->with('apiaryStand')->orderBy(['harvest_date' => SORT_DESC, 'id' => SORT_DESC]),
+            'query' => Batch::find()
+                ->with('apiaryStand')
+                ->where(['status' => $needsAttention])
+                ->orderBy(['harvest_date' => SORT_DESC, 'id' => SORT_DESC]),
             'pagination' => ['pageSize' => 20],
         ]);
 
-        return $this->render('release-gate', ['dataProvider' => $dataProvider]);
+        $pendingCount = (int) Batch::find()->where(['status' => Batch::STATUS_PENDING_RELEASE])->count();
+        $reviewCount  = (int) Batch::find()->where(['status' => Batch::STATUS_REVIEW_REQUIRED])->count();
+
+        return $this->render('release-gate', [
+            'dataProvider' => $dataProvider,
+            'pendingCount' => $pendingCount,
+            'reviewCount'  => $reviewCount,
+        ]);
     }
 
     /**
@@ -107,9 +123,13 @@ class ComplianceController extends Controller
     public function actionRelease(int $id): Response
     {
         $model = $this->findBatch($id);
+        $wasReview = $model->status === Batch::STATUS_REVIEW_REQUIRED;
 
         if ($model->release()) {
-            Yii::$app->session->setFlash('success', "Batch {$model->lot_number} released for sale.");
+            $message = $wasReview
+                ? "Batch {$model->lot_number} re-released for sale; products restored to the shop."
+                : "Batch {$model->lot_number} released for sale.";
+            Yii::$app->session->setFlash('success', $message);
         } else {
             Yii::$app->session->setFlash('error', 'Batch cannot be released — one or more gate conditions are failing.');
         }
@@ -129,10 +149,10 @@ class ComplianceController extends Controller
         $standId   = Yii::$app->request->get('stand_id');
         $dateFrom  = (string) Yii::$app->request->get('date_from', '');
         $dateTo    = (string) Yii::$app->request->get('date_to', '');
-        $submitted = Yii::$app->request->get('export') !== null;
+        $format    = (string) Yii::$app->request->get('format', '');
 
-        if ($submitted && $standId !== null && $standId !== '') {
-            return $this->exportBestandsbuch((int) $standId, $dateFrom, $dateTo);
+        if (in_array($format, ['pdf', 'csv'], true) && $standId !== null && $standId !== '') {
+            return $this->exportBestandsbuch((int) $standId, $dateFrom, $dateTo, $format);
         }
 
         return $this->render('bestandsbuch', [
@@ -142,18 +162,34 @@ class ComplianceController extends Controller
         ]);
     }
 
-    private function exportBestandsbuch(int $standId, string $dateFrom, string $dateTo): Response
-    {
-        $stand = ApiaryStand::findOne($standId);
-        if ($stand === null) {
-            throw new NotFoundHttpException('The selected apiary stand does not exist.');
-        }
+    /** Location identifier used in the header when all stands are exported. */
+    private const ALL_STANDS_LABEL = 'All Apiary Stands — Landkreis Hof';
 
-        $company = CompanyProfile::getInstance();
+    /**
+     * Resolves the stand, company identity and treatment set for the export —
+     * the single underlying query shared by the CSV and PDF outputs. A standId
+     * of 0 means "all stands": the stand filter is dropped and the stand is
+     * returned as null.
+     *
+     * @return array{0:?ApiaryStand,1:CompanyProfile,2:Treatment[]}
+     */
+    private function bestandsbuchData(int $standId, string $dateFrom, string $dateTo): array
+    {
+        $company   = CompanyProfile::getInstance();
+        $allStands = $standId === 0;
+        $stand     = null;
 
         $query = Treatment::find()
-            ->where(['apiary_stand_id' => $standId])
             ->orderBy(['application_date' => SORT_ASC, 'id' => SORT_ASC]);
+
+        if (!$allStands) {
+            $stand = ApiaryStand::findOne($standId);
+            if ($stand === null) {
+                throw new NotFoundHttpException('The selected apiary stand does not exist.');
+            }
+            $query->andWhere(['apiary_stand_id' => $standId]);
+        }
+
         if ($dateFrom !== '') {
             $query->andWhere(['>=', 'application_date', $dateFrom]);
         }
@@ -161,16 +197,34 @@ class ComplianceController extends Controller
             $query->andWhere(['<=', 'application_date', $dateTo]);
         }
         /** @var Treatment[] $treatments */
-        $treatments = $query->with('colony')->all();
+        $treatments = $query->with(['colony', 'apiaryStand'])->all();
 
-        // Document header carrying company identity and stand authority number (AC-CO-03.3)
+        return [$stand, $company, $treatments];
+    }
+
+    private function exportBestandsbuch(int $standId, string $dateFrom, string $dateTo, string $format): Response
+    {
+        [$stand, $company, $treatments] = $this->bestandsbuchData($standId, $dateFrom, $dateTo);
+
+        // Filename / location identifier reflect the selection (single stand vs all).
+        $fileId   = $stand !== null ? $stand->stand_code : 'ALL_STANDS';
+        $location = $stand !== null ? ($stand->stand_code . ' — ' . $stand->name) : self::ALL_STANDS_LABEL;
+        $regNo    = $stand !== null ? $stand->authority_reg_number : 'Various (per stand — see Stand Location column)';
+
+        if ($format === 'pdf') {
+            $pdf = (new PdfExportService())->bestandsbuch($stand, $company, $treatments, $dateFrom, $dateTo);
+            $filename = sprintf('bestandsbuch_%s_%s.pdf', $fileId, date('Ymd'));
+            return $this->sendPdf($filename, $pdf);
+        }
+
+        // Document header carrying company identity and the location identifier (AC-CO-03.3)
         $rows = [
             ['Bestandsbuch — Treatment Ledger (EU Reg. 2019/6 Art. 108(2))'],
             ['Company', $company->company_name],
             ['Tierhalter (Keeper)', $company->keeper_name],
             ['Address', trim($company->address . ', ' . $company->postcode . ' ' . $company->city, ', ')],
-            ['Apiary Stand', $stand->stand_code . ' — ' . $stand->name],
-            ['Veterinäramt Reg. No.', $stand->authority_reg_number],
+            ['Apiary Stand', $location],
+            ['Veterinäramt Reg. No.', $regNo],
             ['Date Range', ($dateFrom ?: 'earliest') . ' to ' . ($dateTo ?: 'latest')],
             [],
             // Column header row (AC-CO-03.2)
@@ -193,6 +247,10 @@ class ComplianceController extends Controller
         ];
 
         foreach ($treatments as $t) {
+            // For all-stands the location is each treatment's own stand.
+            $rowStandCode = $stand !== null
+                ? $stand->stand_code
+                : ($t->apiaryStand->stand_code ?? '');
             $rows[] = [
                 $t->application_date,
                 $t->product_name,
@@ -201,7 +259,7 @@ class ComplianceController extends Controller
                 $t->quantity_per_colony,
                 $t->supplier_name,
                 $t->supplier_address,
-                $stand->stand_code,
+                $rowStandCode,
                 $t->colony->colony_code ?? '',
                 $t->colonies_treated_at_stand,
                 $t->withdrawal_days,
@@ -211,7 +269,7 @@ class ComplianceController extends Controller
             ];
         }
 
-        $filename = sprintf('bestandsbuch_%s_%s.csv', $stand->stand_code, date('Ymd'));
+        $filename = sprintf('bestandsbuch_%s_%s.csv', $fileId, date('Ymd'));
         return $this->sendCsv($filename, $rows);
     }
 
@@ -224,39 +282,129 @@ class ComplianceController extends Controller
      */
     public function actionStockkarte(): string|Response
     {
-        $colonyId  = Yii::$app->request->get('colony_id');
-        $submitted = Yii::$app->request->get('export') !== null;
+        $colonyId    = Yii::$app->request->get('colony_id');
+        $standId     = Yii::$app->request->get('stand_id');
+        $format      = (string) Yii::$app->request->get('format', '');         // per-colony export
+        $standFormat = (string) Yii::$app->request->get('stand_export', '');   // all-colonies-at-stand export
 
-        if ($submitted && $colonyId !== null && $colonyId !== '') {
-            return $this->exportStockkarte((int) $colonyId);
+        // "Export all colonies at this stand"
+        if (in_array($standFormat, ['pdf', 'csv'], true) && $standId !== null && $standId !== '') {
+            return $this->exportStockkarteForStand((int) $standId, $standFormat);
         }
 
-        return $this->render('stockkarte', ['colonyId' => $colonyId]);
+        // Single-colony export
+        if (in_array($format, ['pdf', 'csv'], true) && $colonyId !== null && $colonyId !== '') {
+            return $this->exportStockkarte((int) $colonyId, $format);
+        }
+
+        return $this->render('stockkarte', ['colonyId' => $colonyId, 'standId' => $standId]);
     }
 
-    private function exportStockkarte(int $colonyId): Response
+    private function exportStockkarte(int $colonyId, string $format): Response
     {
         $colony = Colony::findOne($colonyId);
         if ($colony === null) {
             throw new NotFoundHttpException('The selected colony does not exist.');
         }
 
+        if ($format === 'pdf') {
+            $pdf = (new PdfExportService())->stockkarte($colony, $this->stockkarteEntries($colony));
+            $filename = sprintf('stockkarte_%s_%s.pdf', $colony->colony_code, date('Ymd'));
+            return $this->sendPdf($filename, $pdf);
+        }
+
+        $rows = $this->stockkarteCsvBlock($colony);
+        $filename = sprintf('stockkarte_%s_%s.csv', $colony->colony_code, date('Ymd'));
+        return $this->sendCsv($filename, $rows);
+    }
+
+    /**
+     * Exports the Stockkarte for every colony at a stand as a single document
+     * (US-CO-04). CSV: each colony's records are separated by a header row
+     * showing colony code, stand, queen year and status. PDF: each colony
+     * starts on its own page with its own header block.
+     */
+    private function exportStockkarteForStand(int $standId, string $format): Response
+    {
+        $stand = ApiaryStand::findOne($standId);
+        if ($stand === null) {
+            throw new NotFoundHttpException('The selected apiary stand does not exist.');
+        }
+
+        /** @var Colony[] $colonies */
+        $colonies = Colony::find()
+            ->where(['apiary_stand_id' => $standId])
+            ->with('apiaryStand')
+            ->orderBy(['colony_code' => SORT_ASC])
+            ->all();
+
+        if ($format === 'pdf') {
+            $pdf = (new PdfExportService())->stockkarteForStand($stand, $colonies);
+            $filename = sprintf('stockkarte_%s_ALL_COLONIES_%s.pdf', $stand->stand_code, date('Ymd'));
+            return $this->sendPdf($filename, $pdf);
+        }
+
+        $rows = [
+            ['Stockkarte — All Colonies at ' . $stand->stand_code . ' (' . $stand->name . ')'],
+            ['Company', CompanyProfile::getInstance()->company_name],
+            ['Colonies', (string) count($colonies)],
+            [],
+        ];
+        foreach ($colonies as $colony) {
+            // Each colony block carries its own identity header (AC-CO-04.3).
+            $rows = array_merge($rows, $this->stockkarteCsvBlock($colony, true), [[]]);
+        }
+        if ($colonies === []) {
+            $rows[] = ['No colonies are currently assigned to this stand.'];
+        }
+
+        $filename = sprintf('stockkarte_%s_ALL_COLONIES_%s.csv', $stand->stand_code, date('Ymd'));
+        return $this->sendCsv($filename, $rows);
+    }
+
+    /**
+     * Returns a colony's Stockkarte entries in chronological (ascending) order.
+     *
+     * @return array<int,array{type:string,date:string,record:object}>
+     */
+    private function stockkarteEntries(Colony $colony): array
+    {
         // getStockkarte() returns entries newest-first; export in chronological order.
         $entries = $colony->getStockkarte();
         usort($entries, static fn (array $a, array $b): int => strcmp((string) $a['date'], (string) $b['date']));
+        return $entries;
+    }
 
-        // Header carrying colony identity (AC-CO-04.3)
-        $rows = [
-            ['Stockkarte — Colony Record'],
-            ['Colony', $colony->colony_code],
-            ['Current Apiary Stand', $colony->apiaryStand->stand_code ?? ''],
-            ['Queen Year', $colony->queen_year],
-            ['Status', ucfirst($colony->status)],
-            [],
-            ['Date', 'Record Type', 'Details', 'Submitted By'],
-        ];
+    /**
+     * Builds the CSV rows for one colony: an identity header row, a column
+     * header row, then one row per chronological entry.
+     *
+     * @return array<int,array<int,mixed>>
+     */
+    private function stockkarteCsvBlock(Colony $colony, bool $compactHeader = false): array
+    {
+        if ($compactHeader) {
+            // Single clear separator row used when several colonies share one file.
+            $header = [[
+                'Colony', $colony->colony_code,
+                'Current Stand', $colony->apiaryStand->stand_code ?? '',
+                'Queen Year', $colony->queen_year,
+                'Status', ucfirst($colony->status),
+            ]];
+        } else {
+            $header = [
+                ['Stockkarte — Colony Record'],
+                ['Colony', $colony->colony_code],
+                ['Current Apiary Stand', $colony->apiaryStand->stand_code ?? ''],
+                ['Queen Year', $colony->queen_year],
+                ['Status', ucfirst($colony->status)],
+                [],
+            ];
+        }
 
-        foreach ($entries as $entry) {
+        $rows = array_merge($header, [['Date', 'Record Type', 'Details', 'Submitted By']]);
+
+        foreach ($this->stockkarteEntries($colony) as $entry) {
             $record = $entry['record'];
             $rows[] = [
                 $entry['date'],
@@ -266,8 +414,33 @@ class ComplianceController extends Controller
             ];
         }
 
-        $filename = sprintf('stockkarte_%s_%s.csv', $colony->colony_code, date('Ymd'));
-        return $this->sendCsv($filename, $rows);
+        return $rows;
+    }
+
+    /**
+     * Colonies at a stand as JSON for the Stockkarte form's dependent dropdown,
+     * mirroring the treatment/inspection dependent-colony pattern.
+     */
+    public function actionColoniesForStand(int $standId): Response
+    {
+        Yii::$app->response->format = Response::FORMAT_JSON;
+
+        $colonies = Colony::find()
+            ->where(['apiary_stand_id' => $standId])
+            ->orderBy(['colony_code' => SORT_ASC])
+            ->all();
+
+        $data = [];
+        foreach ($colonies as $colony) {
+            $data[] = [
+                'id'          => $colony->id,
+                'colony_code' => $colony->colony_code,
+                'status'      => $colony->status,
+            ];
+        }
+
+        Yii::$app->response->data = $data;
+        return Yii::$app->response;
     }
 
     /**
@@ -298,6 +471,11 @@ class ComplianceController extends Controller
                 'Honey variety'=> $record->honey_variety,
                 'Quantity kg'  => $record->harvest_quantity_kg,
                 'Status'       => $record->status,
+            ],
+            'feeding' => [
+                'Quantity' => $record->feeding_quantity,
+                'Weather'  => $record->weather,
+                'Notes'    => $record->notes,
             ],
             default => [],
         };
@@ -439,6 +617,19 @@ class ComplianceController extends Controller
         $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
         $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
         $response->content = "\xEF\xBB\xBF" . $csv; // UTF-8 byte-order mark
+        return $response;
+    }
+
+    /**
+     * Streams a generated PDF binary as an inline download.
+     */
+    private function sendPdf(string $filename, string $pdf): Response
+    {
+        $response = Yii::$app->response;
+        $response->format = Response::FORMAT_RAW;
+        $response->headers->set('Content-Type', 'application/pdf');
+        $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
+        $response->content = $pdf;
         return $response;
     }
 

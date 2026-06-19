@@ -163,7 +163,45 @@ class Colony extends ActiveRecord
         $this->disease_flag_cleared_at  = null;
         $this->disease_flag_cleared_by  = null;
         $this->disease_flag_resolution  = null;
-        return $this->save(false);
+        if (!$this->save(false)) {
+            return false;
+        }
+
+        $this->cascadeReviewToReleasedBatches();
+        return true;
+    }
+
+    /**
+     * AC-CO-02.5 — when a colony is disease-flagged after one of its batches has
+     * already been released, that batch can no longer be trusted: it is forced
+     * back to review_required and any product published from it is unpublished,
+     * blocking further sales until the head beekeeper manually re-evaluates.
+     *
+     * Released batches do not auto-revert when the flag is later cleared.
+     */
+    private function cascadeReviewToReleasedBatches(): void
+    {
+        /** @var Batch[] $releasedBatches */
+        $releasedBatches = $this->getBatches()
+            ->andWhere(['status' => Batch::STATUS_RELEASED])
+            ->all();
+
+        foreach ($releasedBatches as $batch) {
+            $batch->status      = Batch::STATUS_REVIEW_REQUIRED;
+            $batch->review_note = sprintf(
+                'Review triggered by a disease flag set on source colony %s on %s.',
+                $this->colony_code,
+                date('Y-m-d'),
+            );
+            $batch->save(false);
+
+            // Pull any currently-published product from this batch out of the shop,
+            // marking it so a later re-release restores exactly these products.
+            Product::updateAll(
+                ['is_published' => 0, 'review_unpublished' => 1],
+                ['batch_id' => $batch->id, 'is_published' => 1],
+            );
+        }
     }
 
     /**
@@ -220,6 +258,11 @@ class Colony extends ActiveRecord
 
         foreach ($this->inspections as $i) {
             $entries[] = ['type' => 'inspection', 'date' => $i->inspection_date, 'record' => $i];
+            // An inspection where supplementary feeding was applied also yields a
+            // distinct Fütterung event on the Stockkarte timeline.
+            if ($i->feeding_applied) {
+                $entries[] = ['type' => 'feeding', 'date' => $i->inspection_date, 'record' => $i];
+            }
         }
         foreach ($this->treatments as $t) {
             $entries[] = ['type' => 'treatment', 'date' => $t->application_date, 'record' => $t];

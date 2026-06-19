@@ -19,6 +19,14 @@ return [
         'request' => [
             'csrfParam' => '_csrf-frontend',
         ],
+        // German date presentation for all customer-facing dates (Fix 5).
+        'formatter' => [
+            'locale'          => 'de-DE',
+            'dateFormat'      => 'php:d.m.Y',
+            'datetimeFormat'  => 'php:d.m.Y H:i',
+            'timeFormat'      => 'php:H:i',
+            'nullDisplay'     => '—',
+        ],
         'user' => [
             'identityClass' => \common\models\User::class,
             'enableAutoLogin' => true,

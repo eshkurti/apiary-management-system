@@ -5,7 +5,10 @@ declare(strict_types=1);
 /** @var yii\web\View $this */
 /** @var common\models\Batch $model */
 
+use backend\components\BatchStatusBadge;
 use backend\components\StatusBadge;
+use common\models\Batch;
+use common\models\User;
 use yii\helpers\Html;
 use yii\widgets\DetailView;
 
@@ -13,19 +16,30 @@ $this->title = 'Batch ' . $model->lot_number;
 $this->params['breadcrumbs'][] = ['label' => 'Batches', 'url' => ['index']];
 $this->params['breadcrumbs'][] = $model->lot_number;
 
-$checks    = $model->getReleaseGateChecks();
-$canRelease = Yii::$app->user->can('releaseBatch');
-$canEdit    = Yii::$app->user->can('completeBatchDetails');
-$gatePassed = $model->canBeReleased();
+$canEdit     = Yii::$app->user->can('completeBatchDetails');
+$canEvaluate = Yii::$app->user->can('evaluateReleaseGate');
+$canProducts = Yii::$app->user->can('manageProducts');
+
+// Production-side allocation only — no compliance evaluation lives on this page.
+$allocated    = $model->totalProductStock();   // sum of stock across all products (published or not)
+$remaining    = $model->remainingUnits();       // packaged units − allocated
+$soldThrough  = $model->isSoldThrough();
+$hasUnitCount = $model->packaged_unit_count !== null;
+// Shared eligibility — keeps this button in step with the Products → New
+// selector and the server-side create guard (released, units left, not sold through).
+$canCreate    = $canProducts && $hasUnitCount && $model->isAvailableForNewProduct();
 ?>
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0">
         <?= Html::encode($this->title) ?>
-        <?= StatusBadge::html($model->status) ?>
+        <?= BatchStatusBadge::html($model) ?>
     </h1>
     <div>
         <?php if ($canEdit && $model->isPendingRelease()): ?>
             <?= Html::a('Complete Details', ['update', 'id' => $model->id], ['class' => 'btn btn-outline-secondary']) ?>
+        <?php endif ?>
+        <?php if ($canCreate): ?>
+            <?= Html::a('Create product from this batch →', ['/product/create', 'batch_id' => $model->id], ['class' => 'btn btn-warning']) ?>
         <?php endif ?>
     </div>
 </div>
@@ -95,81 +109,63 @@ $gatePassed = $model->canBeReleased();
     </div>
 
     <div class="col-lg-5">
+        <!-- Release status: production status + a pointer to Compliance only.
+             No gate evaluation/score is shown here — that lives in Compliance. -->
         <div class="card shadow-sm">
             <div class="card-header bg-white fw-semibold">
-                Release Gate <small class="text-muted">(Freigabeprüfung)</small>
+                Release status <small class="text-muted">(Freigabe)</small>
             </div>
-            <ul class="list-group list-group-flush">
-                <?php foreach ($checks as $label => $check): ?>
-                    <li class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <span><?= Html::encode($label) ?></span>
-                            <?php if ($check['passed']): ?>
-                                <span class="badge bg-success">PASS</span>
-                            <?php else: ?>
-                                <span class="badge bg-danger">FAIL</span>
-                            <?php endif ?>
-                        </div>
-                        <div class="small text-muted"><?= Html::encode($check['reason']) ?></div>
-                        <?php if (!$check['passed']): ?>
-                            <?php
-                            // Direct navigation links so the head beekeeper can
-                            // resolve each failing check immediately.
-                            $editLink = Html::a(
-                                '→ Complete batch details',
-                                ['update', 'id' => $model->id],
-                                ['class' => 'small'],
-                            );
-                            ?>
-                            <div class="mt-1">
-                                <?php switch ($check['type']):
-                                    case 'withdrawal': ?>
-                                        <?php foreach ($check['colonies'] as $c): ?>
-                                            <div><?= Html::a(
-                                                '→ View treatments for ' . Html::encode($c['code']),
-                                                ['/treatment/index', 'colony_id' => $c['id']],
-                                                ['class' => 'small'],
-                                            ) ?></div>
-                                        <?php endforeach ?>
-                                        <?php break; ?>
-                                    <?php case 'disease': ?>
-                                        <?php foreach ($check['colonies'] as $c): ?>
-                                            <div><?= Html::a(
-                                                '→ Manage disease flag on ' . Html::encode($c['code']),
-                                                ['/colony/view', 'id' => $c['id']],
-                                                ['class' => 'small'],
-                                            ) ?></div>
-                                        <?php endforeach ?>
-                                        <?php break; ?>
-                                    <?php case 'water': ?>
-                                    <?php case 'label': ?>
-                                    <?php case 'haccp': ?>
-                                        <?= $editLink ?>
-                                        <?php break; ?>
-                                <?php endswitch ?>
-                            </div>
-                        <?php endif ?>
-                    </li>
-                <?php endforeach ?>
-            </ul>
             <div class="card-body">
+                <p class="mb-2"><?= StatusBadge::html($model->status) ?></p>
                 <?php if ($model->isReleased()): ?>
-                    <div class="alert alert-success mb-0">
-                        Released on <?= Yii::$app->formatter->asDatetime($model->released_at) ?>.
+                    <?php $releasedBy = $model->released_by ? User::findOne($model->released_by) : null; ?>
+                    <div class="small text-muted">
+                        Released on <?= Yii::$app->formatter->asDatetime($model->released_at) ?>
+                        by <?= Html::encode($releasedBy->username ?? ('user #' . (int) $model->released_by)) ?>.
                     </div>
-                <?php elseif ($gatePassed): ?>
-                    <?php if ($canRelease): ?>
-                        <?= Html::beginForm(['release', 'id' => $model->id], 'post') ?>
-                        <?= Html::submitButton('Release Batch for Sale', [
-                            'class' => 'btn btn-success w-100',
-                            'data' => ['confirm' => 'Release batch ' . $model->lot_number . ' for sale?'],
-                        ]) ?>
-                        <?= Html::endForm() ?>
-                    <?php else: ?>
-                        <div class="alert alert-info mb-0">All checks pass. Awaiting release by the head beekeeper.</div>
+                    <?php if ($model->review_note): ?>
+                        <div class="small text-muted mt-1">Audit trail: <?= Html::encode($model->review_note) ?></div>
                     <?php endif ?>
                 <?php else: ?>
-                    <button class="btn btn-secondary w-100" disabled>Release blocked — resolve failing checks</button>
+                    <?php if ($model->status === Batch::STATUS_REVIEW_REQUIRED && $model->review_note): ?>
+                        <div class="small text-danger mb-2"><?= Html::encode($model->review_note) ?></div>
+                    <?php endif ?>
+                    <p class="text-muted small mb-2">The release decision is made in the Compliance module.</p>
+                    <?php if ($canEvaluate): ?>
+                        <?= Html::a('Go to Release Gate →', ['/compliance/gate', 'id' => $model->id], ['class' => 'btn btn-outline-primary w-100']) ?>
+                    <?php endif ?>
+                <?php endif ?>
+            </div>
+        </div>
+
+        <!-- Batch allocation summary -->
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-white fw-semibold">Batch allocation</div>
+            <div class="card-body">
+                <?php if (!$hasUnitCount): ?>
+                    <p class="text-muted mb-0">Complete batch production details to see allocation.</p>
+                <?php else: ?>
+                    <?php if ($soldThrough): ?>
+                        <div class="alert alert-secondary py-2 mb-3"><strong>This batch has sold through.</strong> All honey from this batch has been sold; the record stays intact for compliance and recall.</div>
+                    <?php elseif ($remaining < 0): ?>
+                        <div class="alert alert-danger py-2 mb-3"><strong>Over-allocated.</strong> Products claim more units than the batch yields — please investigate.</div>
+                    <?php elseif ($remaining === 0): ?>
+                        <div class="alert alert-warning py-2 mb-3"><strong>All units from this batch have been allocated to products.</strong> Stock is still available for sale.</div>
+                    <?php endif ?>
+                    <table class="table table-sm mb-0">
+                        <tr>
+                            <th>Total packaged units</th>
+                            <td class="text-end"><?= (int) $model->packaged_unit_count ?></td>
+                        </tr>
+                        <tr>
+                            <th>Allocated to products</th>
+                            <td class="text-end"><?= $allocated ?></td>
+                        </tr>
+                        <tr>
+                            <th>Remaining available</th>
+                            <td class="text-end <?= $remaining < 0 ? 'text-danger fw-semibold' : '' ?>"><?= $remaining ?></td>
+                        </tr>
+                    </table>
                 <?php endif ?>
             </div>
         </div>

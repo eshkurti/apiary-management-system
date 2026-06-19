@@ -6,6 +6,7 @@ declare(strict_types=1);
 /** @var array<string,int> $openOrders */
 /** @var common\models\Product[] $products */
 /** @var int $lowStockCount */
+/** @var int $soldOutCount */
 /** @var common\models\Colony[] $withdrawalColonies */
 /** @var array<int, array{batch: common\models\Batch, failing: array<string,string>}> $pendingBatches */
 
@@ -42,6 +43,9 @@ $openTotal = array_sum($openOrders);
                 <div class="text-muted small text-uppercase">Low Stock Products</div>
                 <div class="display-6 fw-semibold <?= $lowStockCount > 0 ? 'text-danger' : '' ?>"><?= $lowStockCount ?></div>
                 <div class="small text-muted">published products under 10 units</div>
+                <div class="small <?= $soldOutCount > 0 ? 'text-secondary fw-semibold' : 'text-muted' ?> mt-1">
+                    <?= $soldOutCount ?> product<?= $soldOutCount === 1 ? '' : 's' ?> sold out — lot pages remain public
+                </div>
             </div>
         </div>
     </div>

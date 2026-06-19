@@ -21,6 +21,7 @@ use yii\db\ActiveRecord;
  * @property float|null  $wholesale_price
  * @property int         $stock_quantity
  * @property int         $is_published
+ * @property int         $review_unpublished
  * @property int         $created_at
  * @property int         $updated_at
  * @property int         $created_by
@@ -49,10 +50,15 @@ class Product extends ActiveRecord
             [['batch_id', 'name', 'price'], 'required'],
             [['batch_id', 'stock_quantity'], 'integer'],
             [['stock_quantity'], 'integer', 'min' => 0],
+            // A brand-new product must list at least one unit — a zero-stock
+            // product has no purpose. Existing products may legitimately reach
+            // zero (sold through) and must still be saveable, so this only
+            // applies on creation.
+            [['stock_quantity'], 'validateStockNotZeroOnCreate'],
             [['price'], 'number', 'min' => 0.01],
             [['wholesale_price'], 'number', 'min' => 0.01],
             [['wholesale_price'], 'default', 'value' => null],
-            [['is_published'], 'boolean'],
+            [['is_published', 'review_unpublished'], 'boolean'],
             [['name'], 'string', 'max' => 150],
             [['description'], 'string'],
             [['batch_id'], 'exist', 'targetClass' => Batch::class, 'targetAttribute' => 'id'],
@@ -65,6 +71,18 @@ class Product extends ActiveRecord
             // Stock cannot exceed the batch's theoretical maximum yield.
             [['stock_quantity'], 'validateStockWithinYield'],
         ];
+    }
+
+    /**
+     * A new product must list at least one unit (AC: zero-stock products serve
+     * no purpose). Only enforced on creation so sold-through products — which
+     * naturally reach zero — can still be edited, unpublished, and saved.
+     */
+    public function validateStockNotZeroOnCreate(string $attribute): void
+    {
+        if ($this->isNewRecord && (int) $this->stock_quantity < 1) {
+            $this->addError($attribute, 'A new product must list at least 1 unit.');
+        }
     }
 
     /**
@@ -81,16 +99,29 @@ class Product extends ActiveRecord
     }
 
     /**
-     * Stock quantity must not exceed the theoretical maximum number of
-     * packaged units derivable from the source batch (Change 3).
+     * Stock quantity must not exceed the units still available from the source
+     * batch — its available units minus the stock already allocated to the
+     * batch's other products (including unpublished ones). This prevents
+     * over-allocating a batch across multiple sibling products.
      */
     public function validateStockWithinYield(string $attribute): void
     {
-        $max = $this->theoreticalMaxUnits();
-        if ($max !== null && (int) $this->stock_quantity > $max) {
+        $batch = $this->batch;
+        if ($batch === null || $batch->availableUnits() === null) {
+            return; // no determinable cap (no packaged count and no container size)
+        }
+
+        // remainingUnits() excludes this product's own existing allocation,
+        // so on edit we compare against what the *other* products have taken.
+        $remaining = $batch->remainingUnits($this->id);
+        if ((int) $this->stock_quantity > $remaining) {
+            $available = max(0, $remaining);
             $this->addError($attribute, sprintf(
-                'Stock quantity cannot exceed the theoretical maximum of %d units for this batch.',
-                $max,
+                'Only %d unit%s remain available from batch %s — the rest is already '
+                . 'allocated to other products. Reduce the quantity to fit.',
+                $available,
+                $available === 1 ? '' : 's',
+                $batch->lot_number,
             ));
         }
     }

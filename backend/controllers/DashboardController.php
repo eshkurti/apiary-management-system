@@ -62,6 +62,12 @@ class DashboardController extends Controller
             }
         }
 
+        // Published products that have completely sold through (stock = 0). Their
+        // lot/traceability pages remain public on purpose (Change 6).
+        $soldOutCount = (int) Product::find()
+            ->where(['is_published' => 1, 'stock_quantity' => 0])
+            ->count();
+
         // AC-EC-08.3 — colonies currently within an active withdrawal period
         $today = date('Y-m-d');
         $withdrawalColonies = Colony::find()
@@ -91,6 +97,7 @@ class DashboardController extends Controller
             'openOrders'         => $openOrders,
             'products'           => $products,
             'lowStockCount'      => $lowStockCount,
+            'soldOutCount'       => $soldOutCount,
             'withdrawalColonies' => $withdrawalColonies,
             'pendingBatches'     => $pendingBatches,
         ]);

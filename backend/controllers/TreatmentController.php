@@ -39,7 +39,7 @@ class TreatmentController extends Controller
                     ],
                     [
                         'allow' => true,
-                        'actions' => ['create', 'product-data', 'colonies-for-stand'],
+                        'actions' => ['create', 'bulk', 'product-data', 'colonies-for-stand'],
                         'roles' => ['recordTreatment'],
                     ],
                 ],
@@ -105,6 +105,112 @@ class TreatmentController extends Controller
         }
 
         return $this->render('create', ['model' => $model]);
+    }
+
+    /**
+     * Records the same treatment against every selected colony at a stand in one
+     * pass (US-PM-04 bulk entry). One individual Treatment row is created per
+     * checked colony, all sharing identical values except colony_id, inside a
+     * single transaction — if any record fails, all are rolled back.
+     *
+     * colonies_treated_at_stand is set automatically to the number of colonies
+     * checked; apiary_stand_id on each record is the selected stand.
+     */
+    public function actionBulk(): string|Response
+    {
+        $model = new Treatment([
+            'treatment_type'          => Treatment::TYPE_VARROA,
+            'application_date'        => date('Y-m-d'),
+            'treatment_duration_days' => 1,
+            'operator_name'           => Yii::$app->user->identity?->username ?? '',
+        ]);
+        $selectedColonyIds = [];
+
+        $request = Yii::$app->request;
+        if ($request->isPost) {
+            $model->load($request->post());
+            $selectedColonyIds = array_values(array_unique(array_map('intval', (array) $request->post('colony_ids', []))));
+            $standId = (int) $model->apiary_stand_id;
+            $count   = count($selectedColonyIds);
+
+            // Validate the colony selection against the chosen stand.
+            $selectionError = $this->validateBulkColonies($selectedColonyIds, $standId);
+
+            // Validate the shared treatment values once, using the first colony
+            // as a representative so the required / colony-stand rules pass.
+            $model->colonies_treated_at_stand = max(1, $count);
+            if ($count > 0) {
+                $model->colony_id = $selectedColonyIds[0];
+            }
+
+            if ($selectionError !== null) {
+                $model->addError('apiary_stand_id', $selectionError);
+            } elseif ($model->validate()) {
+                $transaction = Yii::$app->db->beginTransaction();
+                try {
+                    $lastExpiry = null;
+                    foreach ($selectedColonyIds as $colonyId) {
+                        $treatment = new Treatment();
+                        // Copy the shared (safe) field values from the template.
+                        $treatment->setAttributes($model->attributes);
+                        $treatment->colony_id                 = $colonyId;
+                        $treatment->apiary_stand_id           = $standId;
+                        $treatment->colonies_treated_at_stand = $count;
+
+                        if (!$treatment->save()) {
+                            throw new \RuntimeException(
+                                'Could not save the treatment for one of the colonies: '
+                                . implode('; ', $treatment->getFirstErrors()),
+                            );
+                        }
+                        $lastExpiry = $treatment->wartezeit_expiry;
+                    }
+                    $transaction->commit();
+                    Yii::$app->session->setFlash(
+                        'success',
+                        "Bulk treatment recorded for {$count} colonies. Wartezeit expires {$lastExpiry}.",
+                    );
+                    return $this->redirect(['index']);
+                } catch (\Throwable $e) {
+                    $transaction->rollBack();
+                    $model->addError('apiary_stand_id', $e->getMessage());
+                }
+            }
+        }
+
+        return $this->render('bulk', [
+            'model'             => $model,
+            'selectedColonyIds' => $selectedColonyIds,
+        ]);
+    }
+
+    /**
+     * Validates that at least one colony is selected and that every selected
+     * colony currently belongs to the chosen stand. Returns an error message
+     * naming the offending colony, or null.
+     *
+     * @param int[] $colonyIds
+     */
+    private function validateBulkColonies(array $colonyIds, int $standId): ?string
+    {
+        if ($standId <= 0) {
+            return 'Select an apiary stand first.';
+        }
+        if (empty($colonyIds)) {
+            return 'Select at least one colony to treat.';
+        }
+
+        $offending = [];
+        foreach (Colony::findAll(['id' => $colonyIds]) as $colony) {
+            if ((int) $colony->apiary_stand_id !== $standId) {
+                $offending[] = $colony->colony_code;
+            }
+        }
+        if (!empty($offending)) {
+            return 'These colonies are not assigned to the selected stand: ' . implode(', ', $offending) . '.';
+        }
+
+        return null;
     }
 
     /**

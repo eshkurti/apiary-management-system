@@ -85,7 +85,7 @@ $maxQty   = min(10, (int) $product->stock_quantity);
         <dd class="col-sm-9"><?= Html::encode($batch->honey_variety ?? '—') ?></dd>
 
         <dt class="col-sm-3">Harvest Date</dt>
-        <dd class="col-sm-9"><?= Html::encode((string) ($batch->harvest_date ?? '—')) ?></dd>
+        <dd class="col-sm-9"><?= $batch && $batch->harvest_date ? Yii::$app->formatter->asDate($batch->harvest_date) : '—' ?></dd>
 
         <dt class="col-sm-3">Water Content</dt>
         <dd class="col-sm-9"><?= $batch && $batch->water_content !== null ? Html::encode($batch->water_content . ' %') : '—' ?></dd>

@@ -19,23 +19,21 @@ $releasedBatches = ArrayHelper::map(
     static fn (Batch $b): string => $b->lot_number . ' — ' . $b->honey_variety,
 );
 
-// Yield data per batch for the client-side stock hint / max (Change 3).
+// Remaining-units data per batch for the client-side stock hint / max — the
+// units still unallocated across the batch's other products (excluding this one).
 $batchYield = [];
 foreach ($batchRecords as $b) {
-    $grams = Batch::containerSizeGrams($b->container_size);
-    $max   = ($grams && $b->harvest_quantity_kg)
-        ? (int) floor(((float) $b->harvest_quantity_kg * 1000) / $grams)
-        : null;
+    $max = $b->availableUnits() !== null ? max(0, $b->remainingUnits($model->id)) : null;
     $batchYield[$b->id] = [
-        'harvestKg'  => (float) $b->harvest_quantity_kg,
-        'container'  => (string) ($b->container_size ?? ''),
-        'grams'      => $grams,
-        'maxUnits'   => $max,
+        'container' => (string) ($b->container_size ?? ''),
+        'maxUnits'  => $max,
     ];
 }
 
-$batch       = $model->batch; // inherited provenance, if a batch is already selected
-$initialMax  = $model->theoreticalMaxUnits();
+$batch      = $model->batch; // inherited provenance, if a batch is already selected
+$initialMax = ($batch !== null && $batch->availableUnits() !== null)
+    ? max(0, $batch->remainingUnits($model->id))
+    : null;
 ?>
 <div class="card shadow-sm" style="max-width: 820px;">
     <div class="card-body">
@@ -53,13 +51,14 @@ $initialMax  = $model->theoreticalMaxUnits();
             <div class="col-md-8"><?= $form->field($model, 'wholesale_price')->textInput()
                 ->label('Wholesale Price (€) — leave blank to use standard price for all customers') ?></div>
             <div class="col-md-4"><?= $form->field($model, 'stock_quantity')->textInput([
-                'max' => $initialMax !== null ? $initialMax : null,
+                'type' => 'number',
+                'min'  => $model->isNewRecord ? 1 : 0,
+                'max'  => $initialMax !== null ? $initialMax : null,
             ])->hint(
                 '<span id="yield-hint">' . (
                     $initialMax !== null && $batch !== null
-                        ? 'Based on ' . Html::encode((string) $batch->harvest_quantity_kg) . 'kg harvest with '
-                            . Html::encode((string) $batch->container_size) . ' containers, theoretical maximum is approximately '
-                            . $initialMax . ' units'
+                        ? $initialMax . ' units remaining from batch ' . Html::encode($batch->lot_number)
+                            . ' (after allocation to other products)'
                         : 'Packaged units available for sale.'
                 ) . '</span>',
                 ['encode' => false],
@@ -115,8 +114,7 @@ $js = <<<JS
     function syncYield() {
         var data = yield[\$batch.val()];
         if (data && data.maxUnits != null) {
-            \$hint.text('Based on ' + data.harvestKg + 'kg harvest with ' + data.container +
-                ' containers, theoretical maximum is approximately ' + data.maxUnits + ' units');
+            \$hint.text(data.maxUnits + ' units remaining from this batch (after allocation to other products)');
             \$stock.attr('max', data.maxUnits);
         } else {
             \$hint.text('Packaged units available for sale.');

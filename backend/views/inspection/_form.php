@@ -10,27 +10,39 @@ use common\models\Colony;
 use yii\bootstrap5\ActiveForm;
 use yii\helpers\ArrayHelper;
 use yii\helpers\Html;
-
-$colonies = ArrayHelper::map(
-    Colony::find()->with('apiaryStand')->orderBy(['colony_code' => SORT_ASC])->all(),
-    'id',
-    static fn (Colony $c): string => $c->colony_code . ' (' . ($c->apiaryStand->stand_code ?? '—') . ')',
-);
+use yii\helpers\Json;
+use yii\helpers\Url;
 
 $stands = ArrayHelper::map(
     ApiaryStand::find()->orderBy(['stand_code' => SORT_ASC])->all(),
     'id',
     static fn (ApiaryStand $s): string => $s->stand_code . ' — ' . $s->name,
 );
+
+// The colony dropdown is populated dynamically from the selected stand (Fix 2).
+// Pre-seed it with the currently selected colony, if any, so a re-rendered form
+// (validation error or edit mode) keeps the choice before JS runs.
+$colonyOptions = [];
+if (!empty($model->colony_id)) {
+    $current = Colony::findOne($model->colony_id);
+    if ($current !== null) {
+        $colonyOptions[$current->id] = $current->colony_code;
+    }
+}
+
+$coloniesUrl   = Url::to(['inspection/colonies-for-stand']);
+$currentColony = (int) ($model->colony_id ?? 0);
 ?>
 <div class="card shadow-sm" style="max-width: 760px;">
     <div class="card-body">
         <?php $form = ActiveForm::begin(); ?>
 
         <div class="row">
-            <div class="col-md-6"><?= $form->field($model, 'colony_id')->dropDownList($colonies, ['prompt' => '— Select colony —']) ?></div>
             <div class="col-md-6"><?= $form->field($model, 'apiary_stand_id')->dropDownList($stands, ['prompt' => '— Select stand —'])
-                ->hint('The stand the colony was inspected at.') ?></div>
+                ->hint('Select the stand first — the colony list updates to match.') ?></div>
+            <div class="col-md-6"><?= $form->field($model, 'colony_id')->dropDownList($colonyOptions, [
+                'prompt' => '— Select stand first —',
+            ])->hint('Only colonies assigned to the selected stand are shown.') ?></div>
         </div>
 
         <div class="row">
@@ -68,15 +80,53 @@ $stands = ArrayHelper::map(
 </div>
 
 <?php
-$js = <<<'JS'
+$coloniesUrlJs = Json::htmlEncode($coloniesUrl);
+$currentColonyJs = Json::htmlEncode($currentColony);
+$js = <<<JS
 (function () {
-    var $check = $('#inspection-feeding_applied');
-    var $wrap  = $('#feeding-quantity-wrap');
-    function sync() {
-        if ($check.is(':checked')) { $wrap.show(); } else { $wrap.hide(); }
+    // ── Feeding quantity toggle ────────────────────────────────────────
+    var \$check = $('#inspection-feeding_applied');
+    var \$wrap  = $('#feeding-quantity-wrap');
+    function syncFeeding() {
+        if (\$check.is(':checked')) { \$wrap.show(); } else { \$wrap.hide(); }
     }
-    $check.on('change', sync);
-    sync();
+    \$check.on('change', syncFeeding);
+    syncFeeding();
+
+    // ── Dependent colony dropdown ──────────────────────────────────────
+    var coloniesUrl   = {$coloniesUrlJs};
+    var currentColony = {$currentColonyJs};
+    var \$stand  = $('#inspection-apiary_stand_id');
+    var \$colony = $('#inspection-colony_id');
+
+    function loadColonies(standId, preselect) {
+        if (!standId) {
+            \$colony.empty().append('<option value="">— Select stand first —</option>');
+            return;
+        }
+        \$.getJSON(coloniesUrl, { standId: standId }, function (rows) {
+            \$colony.empty().append('<option value="">— Select colony —</option>');
+            rows.forEach(function (c) {
+                var label = c.colony_code;
+                if (c.status !== 'active') { label += ' [' + c.status + ']'; }
+                var \$opt = $('<option>').val(c.id).text(label);
+                if (preselect && parseInt(c.id, 10) === parseInt(preselect, 10)) {
+                    \$opt.prop('selected', true);
+                }
+                \$colony.append(\$opt);
+            });
+        });
+    }
+
+    \$stand.on('change', function () {
+        loadColonies($(this).val(), null);
+    });
+
+    // On load: if a stand is already selected (edit / re-render), populate
+    // immediately and keep the current colony selected.
+    if (\$stand.val()) {
+        loadColonies(\$stand.val(), currentColony);
+    }
 })();
 JS;
 $this->registerJs($js);

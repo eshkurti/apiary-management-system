@@ -69,6 +69,9 @@ $navLink = static function (string $label, array $route, string $icon = '•', a
         <?= $navLink('Colonies', ['/colony/index'], '🐝') ?>
         <?= $navLink('Inspections', ['/inspection/index'], '🔍') ?>
         <?= $navLink('Treatments', ['/treatment/index'], '💊') ?>
+        <?php if ($user->can('recordTreatment')): ?>
+            <?= $navLink('Bulk Treatment', ['/treatment/bulk'], '💉') ?>
+        <?php endif ?>
     <?php endif ?>
     <?php if ($user->can('recordHarvest') || $user->can('completeBatchDetails') || $user->can('evaluateReleaseGate')): ?>
         <?= $navLink('Batches', ['/batch/index'], '🍯') ?>

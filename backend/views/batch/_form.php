@@ -18,6 +18,7 @@ if (!empty($model->container_size) && !isset($containerList[$model->container_si
     $containerList = [$model->container_size => $model->container_size . ' (legacy)'] + $containerList;
 }
 $currentGrams = Batch::containerSizeGrams($model->container_size) ?? '';
+$maxUnits     = $model->theoreticalMaxUnits(); // null until a container size is chosen
 ?>
 <div class="card shadow-sm" style="max-width: 860px;">
     <div class="card-body">
@@ -44,7 +45,12 @@ $currentGrams = Batch::containerSizeGrams($model->container_size) ?? '';
             ) ?>
                 <?= Html::hiddenInput('container_size_grams', $currentGrams, ['id' => 'batch-container_size_grams']) ?>
             </div>
-            <div class="col-md-3"><?= $form->field($model, 'packaged_unit_count')->textInput() ?></div>
+            <div class="col-md-3"><?= $form->field($model, 'packaged_unit_count')->textInput(['type' => 'number', 'min' => 0])
+                ->hint('<span id="unit-max-hint">' . (
+                    $maxUnits !== null
+                        ? 'Theoretical max: ' . $maxUnits . ' units'
+                        : 'Select a container size to see the maximum'
+                ) . '</span>', ['encode' => false]) ?></div>
         </div>
 
         <div class="row">
@@ -67,15 +73,25 @@ $currentGrams = Batch::containerSizeGrams($model->container_size) ?? '';
 
 <?php
 $gramsMap = Json::htmlEncode(Batch::containerSizeOptions());
+$harvestKg = (float) ($model->harvest_quantity_kg ?? 0);
 $js = <<<JS
 (function () {
-    var grams = {$gramsMap};
+    var grams     = {$gramsMap};
+    var harvestKg = {$harvestKg};
 
-    // Keep the hidden gram field in sync with the container size dropdown.
+    // Keep the hidden gram field in sync with the container size dropdown,
+    // and recompute the theoretical-max unit hint.
     var \$container = $('#batch-container_size');
     var \$grams     = $('#batch-container_size_grams');
+    var \$maxHint   = $('#unit-max-hint');
     \$container.on('change', function () {
-        \$grams.val(grams[$(this).val()] || '');
+        var g = grams[$(this).val()] || '';
+        \$grams.val(g);
+        if (g && harvestKg > 0) {
+            \$maxHint.text('Theoretical max: ' + Math.floor((harvestKg * 1000) / g) + ' units');
+        } else {
+            \$maxHint.text('Select a container size to see the maximum');
+        }
     });
 
     // Water-content hint reflects the selected honey variety.

@@ -32,6 +32,7 @@ use yii\db\ActiveRecord;
  * @property string|null $origin_statement
  * @property int         $haccp_confirmed
  * @property string      $status
+ * @property string|null $review_note
  * @property int|null    $released_at
  * @property int|null    $released_by
  * @property int         $created_at
@@ -125,6 +126,26 @@ class Batch extends ActiveRecord
         ];
     }
 
+    /**
+     * Guards lot-number immutability at the model layer (AC-PM-06.2). The lot
+     * number is assigned once at harvest time and must never change afterwards,
+     * regardless of what a controller or crafted POST passes in. Applies to both
+     * validated saves and save(false).
+     */
+    public function beforeSave($insert): bool
+    {
+        if (!parent::beforeSave($insert)) {
+            return false;
+        }
+
+        if (!$insert && $this->isAttributeChanged('lot_number')) {
+            $this->addError('lot_number', 'The lot number is permanent and cannot be changed after the batch is created (AC-PM-06.2).');
+            return false;
+        }
+
+        return true;
+    }
+
     public function rules(): array
     {
         return [
@@ -133,6 +154,10 @@ class Batch extends ActiveRecord
             [['lot_number'], 'string', 'max' => 50],
             [['harvest_date', 'fill_date', 'best_before_date'], 'date', 'format' => 'php:Y-m-d'],
             [['apiary_stand_id', 'packaged_unit_count'], 'integer'],
+            [['packaged_unit_count'], 'integer', 'min' => 0],
+            // Packaged unit count cannot exceed the theoretical yield for the
+            // chosen container size and harvest quantity.
+            [['packaged_unit_count'], 'validatePackagedUnitCount'],
             [['harvest_quantity_kg'], 'number', 'min' => 0.01],
             [['water_content'], 'number', 'min' => 0, 'max' => 100],
             // HMF must not exceed the HonigV § 3 statutory maximum of 40 mg/kg.
@@ -142,6 +167,7 @@ class Batch extends ActiveRecord
             [['haccp_confirmed'], 'boolean'],
             [['honey_variety', 'container_size'], 'string', 'max' => 100],
             [['origin_statement'], 'string', 'max' => 255],
+            [['review_note'], 'string', 'max' => 255],
             [['status'], 'in', 'range' => [
                 self::STATUS_PENDING_RELEASE,
                 self::STATUS_RELEASED,
@@ -269,6 +295,122 @@ class Batch extends ActiveRecord
             : self::WATER_LIMIT_STANDARD;
     }
 
+    // ── Packaging yield / product allocation ──────────────────────────────
+
+    /**
+     * Theoretical maximum packaged units derivable from the harvest:
+     *   floor(harvest_quantity_kg × 1000 ÷ container_size_grams).
+     * Returns null when the harvest quantity or container size is unknown.
+     */
+    public function theoreticalMaxUnits(): ?int
+    {
+        if (empty($this->harvest_quantity_kg)) {
+            return null;
+        }
+        $grams = self::containerSizeGrams($this->container_size);
+        if ($grams === null || $grams <= 0) {
+            return null;
+        }
+        return (int) floor(((float) $this->harvest_quantity_kg * 1000) / $grams);
+    }
+
+    /**
+     * The authoritative number of packaged units available from this batch:
+     * the recorded packaged_unit_count, falling back to the theoretical maximum
+     * when it has not been entered. Null when neither can be determined.
+     */
+    public function availableUnits(): ?int
+    {
+        if ($this->packaged_unit_count !== null) {
+            return (int) $this->packaged_unit_count;
+        }
+        return $this->theoreticalMaxUnits();
+    }
+
+    /**
+     * Total stock currently allocated to products of this batch (published or
+     * not — an unpublished product's units still physically exist). Optionally
+     * excludes one product, e.g. the one being validated/edited.
+     */
+    public function allocatedUnits(?int $excludeProductId = null): int
+    {
+        $query = Product::find()->where(['batch_id' => $this->id]);
+        if ($excludeProductId !== null) {
+            $query->andWhere(['<>', 'id', $excludeProductId]);
+        }
+        return (int) ($query->sum('stock_quantity') ?? 0);
+    }
+
+    /**
+     * Units still available to allocate to a (new or edited) product:
+     * available units minus the stock already allocated to the batch's other
+     * products. Can be negative if existing data over-allocated the batch.
+     */
+    public function remainingUnits(?int $excludeProductId = null): int
+    {
+        return (int) ($this->availableUnits() ?? 0) - $this->allocatedUnits($excludeProductId);
+    }
+
+    /**
+     * Total stock across all of this batch's products (published or not).
+     */
+    public function totalProductStock(): int
+    {
+        return $this->allocatedUnits();
+    }
+
+    /**
+     * True when the batch has products but none of them has any stock left —
+     * the batch has sold through. (Derived; the release status is unchanged.)
+     */
+    public function isSoldThrough(): bool
+    {
+        return $this->getProducts()->exists() && $this->totalProductStock() === 0;
+    }
+
+    /**
+     * True when every available unit has been allocated to products but stock
+     * still remains for sale (remaining == 0, stock > 0).
+     */
+    public function isFullyAllocated(): bool
+    {
+        return $this->remainingUnits() === 0 && $this->totalProductStock() > 0;
+    }
+
+    /**
+     * True when a new product may be created from this batch: it is released,
+     * has units still available to allocate, and has not sold through. Used to
+     * gate the "Create product" button, the Products → New batch selector, and
+     * the server-side create guard so all three agree.
+     */
+    public function isAvailableForNewProduct(): bool
+    {
+        return $this->isReleased()
+            && !$this->isSoldThrough()
+            && $this->remainingUnits() > 0;
+    }
+
+    /**
+     * Validates that packaged_unit_count does not exceed the theoretical yield
+     * for the chosen container size. Skipped when either value is absent.
+     */
+    public function validatePackagedUnitCount(string $attribute): void
+    {
+        if ($this->packaged_unit_count === null || empty($this->container_size)) {
+            return;
+        }
+        $max = $this->theoreticalMaxUnits();
+        if ($max !== null && (int) $this->packaged_unit_count > $max) {
+            $this->addError($attribute, sprintf(
+                'Packaged unit count cannot exceed the theoretical maximum of %d units '
+                . '(%s kg in %s containers).',
+                $max,
+                rtrim(rtrim((string) $this->harvest_quantity_kg, '0'), '.'),
+                $this->container_size,
+            ));
+        }
+    }
+
     // ── Five-check release gate ───────────────────────────────────────────
 
     /**
@@ -283,10 +425,21 @@ class Batch extends ActiveRecord
     {
         $checks = [];
 
-        // 1. Treatment withdrawal cleared for all source colonies
+        // 1. Treatment withdrawal cleared at the harvest date for all source
+        //    colonies. The legally relevant question is whether honey was within
+        //    a withdrawal period *when it was harvested* — not today. Only
+        //    treatments applied on or before the harvest date can have affected
+        //    the extracted honey; a treatment applied afterwards is irrelevant to
+        //    this batch. Such a relevant treatment blocks the batch only if its
+        //    Wartezeit expiry falls after the harvest date.
         $blockedColonies = [];
         foreach ($this->colonies as $colony) {
-            if (!$colony->isWithdrawalCleared($this->harvest_date)) {
+            $withinWithdrawalAtHarvest = Treatment::find()
+                ->where(['colony_id' => $colony->id])
+                ->andWhere(['<=', 'application_date', $this->harvest_date])
+                ->andWhere(['>', 'wartezeit_expiry', $this->harvest_date])
+                ->exists();
+            if ($withinWithdrawalAtHarvest) {
                 $blockedColonies[] = ['id' => $colony->id, 'code' => $colony->colony_code];
             }
         }
@@ -372,9 +525,14 @@ class Batch extends ActiveRecord
     }
 
     /**
-     * Releases the batch.
-     * Records releasing user and timestamp (AC-CO-02.2).
-     * Locks all production fields (AC-CO-02.4).
+     * Releases the batch for sale, also serving as the manual re-release path
+     * for a batch that was forced back to review_required by a disease-flag
+     * cascade (AC-CO-02.5). The five gate checks must all pass.
+     *
+     * Records the releasing user and timestamp (AC-CO-02.2) and locks all
+     * production fields (AC-CO-02.4). On a re-release it restores exactly the
+     * products the review cascade pulled from the shop. The review_note is left
+     * intact so the flag event remains in the batch's audit trail.
      */
     public function release(): bool
     {
@@ -384,7 +542,18 @@ class Batch extends ActiveRecord
         $this->status      = self::STATUS_RELEASED;
         $this->released_at = time();
         $this->released_by = Yii::$app->user->id;
-        return $this->save(false);
+        if (!$this->save(false)) {
+            return false;
+        }
+
+        // Re-publish only the products the review cascade unpublished; on a first
+        // release there are none, so this is a harmless no-op.
+        Product::updateAll(
+            ['is_published' => 1, 'review_unpublished' => 0],
+            ['batch_id' => $this->id, 'review_unpublished' => 1],
+        );
+
+        return true;
     }
 
     public function isReleased(): bool

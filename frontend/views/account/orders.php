@@ -35,7 +35,7 @@ $this->params['breadcrumbs'][] = 'Orders';
                 ?>
                 <tr>
                     <td class="fw-semibold"><?= Html::encode($order->order_number) ?></td>
-                    <td><?= Html::encode($order->order_date) ?></td>
+                    <td><?= Yii::$app->formatter->asDate($order->order_date) ?></td>
                     <td><?= $itemCount ?> item<?= $itemCount === 1 ? '' : 's' ?></td>
                     <td>€ <?= number_format((float) $order->total_amount, 2) ?></td>
                     <td><?= StatusBadge::html($order->status) ?></td>

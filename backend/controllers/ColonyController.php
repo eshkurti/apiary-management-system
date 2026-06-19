@@ -45,11 +45,20 @@ class ColonyController extends Controller
                         'actions' => ['move'],
                         'roles' => ['moveColony'],
                     ],
+                    [
+                        'allow' => true,
+                        'actions' => ['set-disease-flag', 'clear-disease-flag'],
+                        'roles' => ['manageDiseaseFlag'],
+                    ],
                 ],
             ],
             'verbs' => [
                 'class' => VerbFilter::class,
-                'actions' => ['delete' => ['post']],
+                'actions' => [
+                    'delete'             => ['post'],
+                    'set-disease-flag'   => ['post'],
+                    'clear-disease-flag' => ['post'],
+                ],
             ],
         ];
     }
@@ -129,6 +138,49 @@ class ColonyController extends Controller
         $this->findModel($id)->delete();
         Yii::$app->session->setFlash('success', 'Colony deleted.');
         return $this->redirect(['index']);
+    }
+
+    /**
+     * Sets a disease concern flag on a colony (US-CO-05, AC-CO-05.1, 05.2).
+     * Blocks release of any batch sourcing this colony and, for batches already
+     * released, forces them back to review_required (AC-CO-02.5).
+     */
+    public function actionSetDiseaseFlag(int $id): Response
+    {
+        $colony = $this->findModel($id);
+        $note   = trim((string) Yii::$app->request->post('note', ''));
+
+        if ($note === '') {
+            Yii::$app->session->setFlash('error', 'Describe the disease concern before setting the flag.');
+            return $this->redirect(['view', 'id' => $id]);
+        }
+
+        if ($colony->setDiseaseFlag($note)) {
+            Yii::$app->session->setFlash('success', "Disease flag set on colony {$colony->colony_code}.");
+        } else {
+            Yii::$app->session->setFlash('error', 'Could not set the disease flag.');
+        }
+
+        return $this->redirect(['view', 'id' => $id]);
+    }
+
+    /**
+     * Clears a disease concern flag (AC-CO-05.3, 05.4). The optional resolution
+     * note is recorded. Released batches that were moved to review_required do
+     * NOT auto-revert — the head beekeeper re-evaluates them manually.
+     */
+    public function actionClearDiseaseFlag(int $id): Response
+    {
+        $colony     = $this->findModel($id);
+        $resolution = trim((string) Yii::$app->request->post('resolution', ''));
+
+        if ($colony->clearDiseaseFlag($resolution)) {
+            Yii::$app->session->setFlash('success', "Disease flag cleared on colony {$colony->colony_code}.");
+        } else {
+            Yii::$app->session->setFlash('error', 'Could not clear the disease flag.');
+        }
+
+        return $this->redirect(['view', 'id' => $id]);
     }
 
     private function findModel(int $id): Colony

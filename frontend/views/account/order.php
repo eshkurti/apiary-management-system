@@ -70,7 +70,7 @@ $cancelled = $order->status === Order::STATUS_CANCELLED;
             <div class="card-header">Delivery address</div>
             <div class="card-body">
                 <div><?= nl2br(Html::encode((string) $order->shipping_address)) ?></div>
-                <div class="text-muted small mt-2">Ordered <?= Html::encode($order->order_date) ?></div>
+                <div class="text-muted small mt-2">Ordered <?= Yii::$app->formatter->asDate($order->order_date) ?></div>
             </div>
         </div>
 

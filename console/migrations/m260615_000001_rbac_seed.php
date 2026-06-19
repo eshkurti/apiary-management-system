@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 use yii\db\Migration;
 
 class m260615_000001_rbac_seed extends Migration
 {
-    public function safeUp()
+    public function safeUp(): void
     {
         $auth = Yii::$app->authManager;
 
@@ -28,7 +30,7 @@ class m260615_000001_rbac_seed extends Migration
         $auth->assign($administrator, 1);
     }
 
-    public function safeDown()
+    public function safeDown(): void
     {
         $auth = Yii::$app->authManager;
 

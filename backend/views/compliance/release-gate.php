@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 /** @var yii\web\View $this */
 /** @var yii\data\ActiveDataProvider $dataProvider */
+/** @var int $pendingCount */
+/** @var int $reviewCount */
 
 use backend\components\StatusBadge;
 use common\models\Batch;
@@ -14,16 +16,31 @@ use yii\helpers\Html;
 $this->title = 'Release Gate';
 $this->params['breadcrumbs'][] = 'Compliance';
 $this->params['breadcrumbs'][] = $this->title;
+
+$total = $pendingCount + $reviewCount;
 ?>
 <h1 class="h3 mb-1">Release Gate <small class="text-muted fs-6">(Freigabeprüfung)</small></h1>
 <p class="text-muted">
-    Every batch must pass all five statutory conditions before it can be released for sale.
-    Open a batch to see which conditions pass and which are blocking release.
+    Batches that need a compliance decision. Open a batch to see which conditions pass
+    and which are blocking release.
 </p>
 
-<div class="card shadow-sm">
-    <div class="card-body">
-        <?= GridView::widget([
+<?php if ($total === 0): ?>
+    <div class="card shadow-sm">
+        <div class="card-body text-center text-muted py-5">
+            No batches currently require compliance review.
+        </div>
+    </div>
+<?php else: ?>
+    <p class="fw-semibold">
+        <?= $pendingCount ?> batch<?= $pendingCount === 1 ? '' : 'es' ?> pending release
+        ·
+        <?= $reviewCount ?> batch<?= $reviewCount === 1 ? '' : 'es' ?> under review
+    </p>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <?= GridView::widget([
             'dataProvider' => $dataProvider,
             'tableOptions' => ['class' => 'table table-striped table-hover align-middle'],
             'columns' => [
@@ -63,6 +80,7 @@ $this->params['breadcrumbs'][] = $this->title;
                     ],
                 ],
             ],
-        ]) ?>
+            ]) ?>
+        </div>
     </div>
-</div>
+<?php endif ?>

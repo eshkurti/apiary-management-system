@@ -12,6 +12,7 @@ namespace backend\assets;
 
 use common\assets\ColorModeAsset;
 use yii\bootstrap5\BootstrapAsset;
+use yii\bootstrap5\BootstrapPluginAsset;
 use yii\web\AssetBundle;
 use yii\web\YiiAsset;
 
@@ -29,6 +30,7 @@ class AppAsset extends AssetBundle
     public $depends = [
         YiiAsset::class,
         BootstrapAsset::class,
+        BootstrapPluginAsset::class, // Bootstrap JS (collapse, dropdown, modal, …)
         ColorModeAsset::class,
     ];
 }

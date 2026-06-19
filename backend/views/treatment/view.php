@@ -50,6 +50,8 @@ $this->params['breadcrumbs'][] = $this->title;
                 'quantity_per_colony',
                 'supplier_name',
                 'supplier_address',
+                'receipt_number',
+                'veterinarian',
                 'application_date',
                 'colonies_treated_at_stand',
                 'withdrawal_days',

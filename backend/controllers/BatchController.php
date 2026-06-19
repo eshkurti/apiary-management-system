@@ -9,7 +9,6 @@ use common\models\Colony;
 use Yii;
 use yii\data\ActiveDataProvider;
 use yii\filters\AccessControl;
-use yii\filters\VerbFilter;
 use yii\web\Controller;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
@@ -41,7 +40,7 @@ class BatchController extends Controller
                     ],
                     [
                         'allow' => true,
-                        'actions' => ['harvest'],
+                        'actions' => ['harvest', 'colonies-for-stand'],
                         'roles' => ['recordHarvest'],
                     ],
                     [
@@ -49,16 +48,10 @@ class BatchController extends Controller
                         'actions' => ['update'],
                         'roles' => ['completeBatchDetails'],
                     ],
-                    [
-                        'allow' => true,
-                        'actions' => ['release'],
-                        'roles' => ['releaseBatch'],
-                    ],
+                    // The release decision is a Compliance act — see
+                    // ComplianceController::actionRelease. Production Management
+                    // only records and tracks batches; it does not release them.
                 ],
-            ],
-            'verbs' => [
-                'class' => VerbFilter::class,
-                'actions' => ['release' => ['post']],
             ],
         ];
     }
@@ -96,6 +89,13 @@ class BatchController extends Controller
             $model->load($request->post());
             $model->lot_number = Batch::generateLotNumber();
             $selectedColonyIds = array_map('intval', (array) $request->post('colony_ids', []));
+
+            // Every selected colony must currently belong to the chosen stand
+            // (same guard the treatment and inspection forms enforce).
+            $standError = $this->validateColoniesBelongToStand($selectedColonyIds, (int) $model->apiary_stand_id);
+            if ($standError !== null) {
+                $model->addError('apiary_stand_id', $standError);
+            }
 
             $error = $this->validateHarvestColonies($selectedColonyIds, (string) $model->harvest_date);
             if ($error !== null) {
@@ -159,19 +159,61 @@ class BatchController extends Controller
     }
 
     /**
-     * Releases a batch for sale if all five gate conditions pass (US-CO-01).
+     * Returns the active colonies currently assigned to a stand as JSON, for the
+     * dependent colony checkbox list on the harvest form. Mirrors
+     * TreatmentController::actionColoniesForStand.
      */
-    public function actionRelease(int $id): Response
+    public function actionColoniesForStand(int $standId): Response
     {
-        $model = $this->findModel($id);
+        Yii::$app->response->format = Response::FORMAT_JSON;
 
-        if ($model->release()) {
-            Yii::$app->session->setFlash('success', "Batch {$model->lot_number} released for sale.");
-        } else {
-            Yii::$app->session->setFlash('error', 'Batch cannot be released — one or more gate conditions are failing.');
+        $colonies = Colony::find()
+            ->where(['apiary_stand_id' => $standId, 'status' => 'active'])
+            ->orderBy(['colony_code' => SORT_ASC])
+            ->all();
+
+        $data = [];
+        foreach ($colonies as $colony) {
+            $expiry = $colony->getLatestWartezeitExpiry();
+            $data[] = [
+                'id'            => $colony->id,
+                'colony_code'   => $colony->colony_code,
+                'status'        => $colony->status,
+                'in_withdrawal' => !$colony->isWithdrawalCleared(),
+                'withdrawal_until' => $colony->isWithdrawalCleared() ? null : $expiry,
+                'disease_flag'  => (bool) $colony->disease_flag,
+            ];
         }
 
-        return $this->redirect(['view', 'id' => $id]);
+        Yii::$app->response->data = $data;
+        return Yii::$app->response;
+    }
+
+    /**
+     * Ensures every selected colony currently belongs to the selected stand.
+     * Returns an error message string naming the offending colony, or null.
+     *
+     * @param int[] $colonyIds
+     */
+    private function validateColoniesBelongToStand(array $colonyIds, int $standId): ?string
+    {
+        if (empty($colonyIds) || $standId <= 0) {
+            return null; // emptiness / missing stand handled by other validators
+        }
+
+        $offending = [];
+        foreach (Colony::findAll(['id' => $colonyIds]) as $colony) {
+            if ((int) $colony->apiary_stand_id !== $standId) {
+                $offending[] = $colony->colony_code;
+            }
+        }
+
+        if (!empty($offending)) {
+            return 'These colonies are not assigned to the selected apiary stand: '
+                . implode(', ', $offending) . '. Select the stand the colonies were located at.';
+        }
+
+        return null;
     }
 
     /**

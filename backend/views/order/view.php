@@ -16,6 +16,7 @@ $this->params['breadcrumbs'][] = $model->order_number;
 
 $labels    = Order::statusLabels();
 $next      = $model->getNextStatus();
+$canCancel = in_array($model->status, [Order::STATUS_RECEIVED, Order::STATUS_PACKED], true);
 
 /** Resolve a user id to a username, cached per request. */
 $userName = static function (?int $id): string {
@@ -34,16 +35,26 @@ $userName = static function (?int $id): string {
         <?= Html::encode($this->title) ?>
         <?= StatusBadge::html($model->status) ?>
     </h1>
-    <?php if ($next !== null): ?>
-        <?= Html::beginForm(['advance', 'id' => $model->id], 'post', ['class' => 'd-inline']) ?>
-        <?= Html::submitButton('Advance to “' . Html::encode($labels[$next]) . '” →', [
-            'class' => 'btn btn-warning',
-            'data' => ['confirm' => 'Advance order ' . $model->order_number . ' to ' . $labels[$next] . '?'],
-        ]) ?>
-        <?= Html::endForm() ?>
-    <?php else: ?>
-        <span class="lin-badge lin-badge--delivered">Fulfilment complete</span>
-    <?php endif ?>
+    <div class="d-flex gap-2">
+        <?php if ($next !== null): ?>
+            <?= Html::beginForm(['advance', 'id' => $model->id], 'post', ['class' => 'd-inline']) ?>
+            <?= Html::submitButton('Advance to “' . Html::encode($labels[$next]) . '” →', [
+                'class' => 'btn btn-warning',
+                'data' => ['confirm' => 'Advance order ' . $model->order_number . ' to ' . $labels[$next] . '?'],
+            ]) ?>
+            <?= Html::endForm() ?>
+        <?php elseif ($model->status !== Order::STATUS_CANCELLED): ?>
+            <span class="lin-badge lin-badge--delivered">Fulfilment complete</span>
+        <?php endif ?>
+        <?php if ($canCancel): ?>
+            <?= Html::beginForm(['cancel', 'id' => $model->id], 'post', ['class' => 'd-inline']) ?>
+            <?= Html::submitButton('Cancel Order', [
+                'class' => 'btn btn-outline-danger',
+                'data' => ['confirm' => 'Cancel order ' . $model->order_number . ' and restore its stock?'],
+            ]) ?>
+            <?= Html::endForm() ?>
+        <?php endif ?>
+    </div>
 </div>
 
 <div class="row">

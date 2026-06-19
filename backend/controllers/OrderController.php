@@ -6,6 +6,7 @@ namespace backend\controllers;
 
 use common\models\Order;
 use common\models\OrderStageLog;
+use common\models\Product;
 use Yii;
 use yii\filters\AccessControl;
 use yii\filters\VerbFilter;
@@ -39,6 +40,7 @@ class OrderController extends Controller
                 'actions' => [
                     'advance'  => ['post'],
                     'add-note' => ['post'],
+                    'cancel'   => ['post'],
                 ],
             ],
         ];
@@ -114,6 +116,56 @@ class OrderController extends Controller
         $log->save();
 
         Yii::$app->session->setFlash('success', 'Note added to the order.');
+        return $this->redirect(['view', 'id' => $id]);
+    }
+
+    /**
+     * Cancels an order and restores the stock it reserved (AC-EC-04.5).
+     * Only orders still in the warehouse (received or packed) may be cancelled;
+     * shipped or delivered orders cannot. Runs in a transaction so the status
+     * change, stock restoration and audit-log entry are all-or-nothing.
+     */
+    public function actionCancel(int $id): Response
+    {
+        $model = $this->findModel($id);
+
+        if (!in_array($model->status, [Order::STATUS_RECEIVED, Order::STATUS_PACKED], true)) {
+            Yii::$app->session->setFlash('error', 'Only orders that are still received or packed can be cancelled.');
+            return $this->redirect(['view', 'id' => $id]);
+        }
+
+        $note = trim((string) Yii::$app->request->post('note', ''));
+        $from = $model->status;
+
+        $tx = Yii::$app->db->beginTransaction();
+        try {
+            $model->status = Order::STATUS_CANCELLED;
+            $model->save(false);
+
+            // Return each line's quantity to the product's stock.
+            foreach ($model->items as $item) {
+                $product = Product::findOne($item->product_id);
+                if ($product !== null) {
+                    $product->stock_quantity += (int) $item->quantity;
+                    $product->save(false);
+                }
+            }
+
+            $log = new OrderStageLog([
+                'order_id'    => $model->id,
+                'from_status' => $from,
+                'to_status'   => Order::STATUS_CANCELLED,
+                'notes'       => $note !== '' ? $note : 'Order cancelled; stock restored.',
+            ]);
+            $log->save(false);
+
+            $tx->commit();
+            Yii::$app->session->setFlash('success', "Order {$model->order_number} cancelled and stock restored.");
+        } catch (\Throwable $e) {
+            $tx->rollBack();
+            throw $e;
+        }
+
         return $this->redirect(['view', 'id' => $id]);
     }
 

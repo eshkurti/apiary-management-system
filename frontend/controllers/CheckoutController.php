@@ -51,6 +51,9 @@ class CheckoutController extends Controller
 
         $user     = Yii::$app->user->identity;
         $customer = $this->findOrCreateCustomer($user);
+        // Checkout requires a complete delivery address — street, postcode, city
+        // (AC-EC-03.2). The scenario also drives the required-field markers in the form.
+        $customer->scenario = Customer::SCENARIO_CHECKOUT;
         $total    = Cart::total();
         $totalQty = Cart::count();
 
@@ -59,7 +62,7 @@ class CheckoutController extends Controller
             $customer->load(Yii::$app->request->post());
 
             if (!$customer->save()) {
-                Yii::$app->session->setFlash('error', 'Please complete the delivery address before placing the order.');
+                Yii::$app->session->setFlash('error', 'Please complete the delivery address (street, postcode and city) before placing the order.');
                 return $this->render('index', compact('items', 'total', 'customer'));
             }
 

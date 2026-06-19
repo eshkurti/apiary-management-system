@@ -41,24 +41,68 @@ $canRelease  = Yii::$app->user->can('releaseBatch');
                             <?php endif ?>
                         </div>
                         <div class="small text-muted"><?= Html::encode($check['reason']) ?></div>
+                        <?php if (!$check['passed']): ?>
+                            <div class="mt-1">
+                                <?php switch ($check['type']):
+                                    // Withdrawal blocked → that colony's filtered treatment list
+                                    case 'withdrawal': ?>
+                                        <?php foreach ($check['colonies'] as $c): ?>
+                                            <div><?= Html::a(
+                                                '→ View treatments for ' . Html::encode($c['code']),
+                                                ['/treatment/index', 'colony_id' => $c['id']],
+                                                ['class' => 'small'],
+                                            ) ?></div>
+                                        <?php endforeach ?>
+                                        <?php break; ?>
+                                    <?php // Disease flag → that colony's view page
+                                    case 'disease': ?>
+                                        <?php foreach ($check['colonies'] as $c): ?>
+                                            <div><?= Html::a(
+                                                '→ Go to colony ' . Html::encode($c['code']),
+                                                ['/colony/view', 'id' => $c['id']],
+                                                ['class' => 'small'],
+                                            ) ?></div>
+                                        <?php endforeach ?>
+                                        <?php break; ?>
+                                    <?php // Water content / label fields / HACCP → batch details edit form
+                                    case 'water': ?>
+                                    <?php case 'label': ?>
+                                    <?php case 'haccp': ?>
+                                        <?= Html::a(
+                                            '→ Go to batch details',
+                                            ['/batch/update', 'id' => $model->id],
+                                            ['class' => 'small'],
+                                        ) ?>
+                                        <?php break; ?>
+                                <?php endswitch ?>
+                            </div>
+                        <?php endif ?>
                     </li>
                 <?php endforeach ?>
             </ul>
             <div class="card-body">
+                <?php $isReRelease = $model->status === \common\models\Batch::STATUS_REVIEW_REQUIRED; ?>
                 <?php if ($model->isReleased()): ?>
                     <div class="alert alert-success mb-0">
                         Released on <?= Yii::$app->formatter->asDatetime($model->released_at) ?>.
                     </div>
                 <?php elseif ($gatePassed): ?>
+                    <?php if ($isReRelease): ?>
+                        <div class="alert alert-success">All gate checks are now passing. You may re-release this batch.</div>
+                    <?php endif ?>
                     <?php if ($canRelease): ?>
                         <?= Html::beginForm(['release', 'id' => $model->id], 'post') ?>
-                        <?= Html::submitButton('Release Batch for Sale', [
-                            'class' => 'btn btn-success w-100',
-                            'data' => ['confirm' => 'Release batch ' . $model->lot_number . ' for sale?'],
-                        ]) ?>
+                        <?= Html::submitButton(
+                            $isReRelease ? 'Re-release Batch for Sale' : 'Release Batch for Sale',
+                            [
+                                'class' => 'btn btn-success w-100',
+                                'data' => ['confirm' => ($isReRelease ? 'Re-release batch ' : 'Release batch ')
+                                    . $model->lot_number . ' for sale?'],
+                            ],
+                        ) ?>
                         <?= Html::endForm() ?>
                     <?php else: ?>
-                        <div class="alert alert-info mb-0">All checks pass. Awaiting release by the head beekeeper.</div>
+                        <div class="alert alert-info mb-0">All checks pass. Awaiting <?= $isReRelease ? 're-release' : 'release' ?> by the head beekeeper.</div>
                     <?php endif ?>
                 <?php else: ?>
                     <button class="btn btn-secondary w-100" disabled>Release blocked — resolve failing checks above</button>

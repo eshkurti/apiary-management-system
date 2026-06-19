@@ -20,7 +20,10 @@ $canRecord = Yii::$app->user->can('recordTreatment');
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0">Treatments <small class="text-muted fs-6">(Bestandsbuch)</small></h1>
     <?php if ($canRecord): ?>
-        <?= Html::a('+ Record Treatment', ['create'], ['class' => 'btn btn-warning']) ?>
+        <div class="d-flex gap-2">
+            <?= Html::a('+ Record Treatment', ['create'], ['class' => 'btn btn-warning']) ?>
+            <?= Html::a('+ Record Bulk Treatment', ['bulk'], ['class' => 'btn btn-outline-warning']) ?>
+        </div>
     <?php endif ?>
 </div>
 

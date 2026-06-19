@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace backend\controllers;
 
+use common\models\Colony;
 use common\models\Inspection;
 use Yii;
 use yii\data\ActiveDataProvider;
@@ -34,7 +35,7 @@ class InspectionController extends Controller
                     ],
                     [
                         'allow' => true,
-                        'actions' => ['create'],
+                        'actions' => ['create', 'colonies-for-stand'],
                         'roles' => ['logInspection'],
                     ],
                 ],
@@ -70,6 +71,33 @@ class InspectionController extends Controller
         }
 
         return $this->render('create', ['model' => $model]);
+    }
+
+    /**
+     * Returns the colonies currently assigned to a stand as JSON, for the
+     * dependent colony dropdown on the inspection form (Fix 2).
+     * Each entry: id, colony_code, status.
+     */
+    public function actionColoniesForStand(int $standId): Response
+    {
+        Yii::$app->response->format = Response::FORMAT_JSON;
+
+        $colonies = Colony::find()
+            ->where(['apiary_stand_id' => $standId])
+            ->orderBy(['colony_code' => SORT_ASC])
+            ->all();
+
+        $data = [];
+        foreach ($colonies as $colony) {
+            $data[] = [
+                'id'          => $colony->id,
+                'colony_code' => $colony->colony_code,
+                'status'      => $colony->status,
+            ];
+        }
+
+        Yii::$app->response->data = $data;
+        return Yii::$app->response;
     }
 
     private function findModel(int $id): Inspection

@@ -26,6 +26,8 @@ use yii\db\ActiveRecord;
  * @property string $quantity_per_colony
  * @property string $supplier_name
  * @property string $supplier_address
+ * @property string|null $receipt_number
+ * @property string|null $veterinarian
  * @property string $application_date
  * @property int    $colonies_treated_at_stand
  * @property int    $withdrawal_days
@@ -102,6 +104,8 @@ class Treatment extends ActiveRecord
             [['quantity_per_colony'], 'string', 'max' => 50],
             [['supplier_name'], 'string', 'max' => 150],
             [['supplier_address'], 'string', 'max' => 255],
+            [['receipt_number'], 'string', 'max' => 100],
+            [['veterinarian'], 'string', 'max' => 255],
             [['notes'], 'string'],
 
             [['colony_id'], 'exist', 'targetClass' => Colony::class, 'targetAttribute' => 'id'],
@@ -141,6 +145,8 @@ class Treatment extends ActiveRecord
             'quantity_per_colony'         => 'Quantity per Colony',
             'supplier_name'               => 'Supplier Name',
             'supplier_address'            => 'Supplier Address',
+            'receipt_number'              => 'Receipt Number (Belegnummer)',
+            'veterinarian'                => 'Veterinarian (if involved)',
             'application_date'            => 'Application Date',
             'colonies_treated_at_stand'   => 'Number of Colonies Treated at Stand',
             'withdrawal_days'             => 'Withdrawal Period (days)',
