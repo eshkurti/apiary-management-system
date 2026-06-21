@@ -26,6 +26,10 @@ $this->params['breadcrumbs'][] = $this->title;
             'tableOptions' => ['class' => 'table table-striped table-hover align-middle'],
             'columns' => [
                 'name',
+                [
+                    'label' => 'Username',
+                    'value' => static fn (Customer $m): string => $m->user?->username ?? '—',
+                ],
                 'email:email',
                 [
                     'attribute' => 'company',

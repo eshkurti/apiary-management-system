@@ -42,7 +42,7 @@ class ApiaryStandController extends Controller
     {
         $dataProvider = new ActiveDataProvider([
             'query' => ApiaryStand::find()->orderBy(['stand_code' => SORT_ASC]),
-            'pagination' => ['pageSize' => 20],
+            'pagination' => ['pageSize' => 10],
         ]);
 
         return $this->render('index', ['dataProvider' => $dataProvider]);

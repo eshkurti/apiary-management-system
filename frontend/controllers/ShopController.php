@@ -30,7 +30,15 @@ class ShopController extends Controller
             'pagination' => ['pageSize' => 12],
         ]);
 
-        return $this->render('index', ['dataProvider' => $dataProvider]);
+        // Wholesale customers see their wholesale price in the grid too.
+        $customer = Yii::$app->user->isGuest
+            ? null
+            : Customer::findOne(['user_id' => Yii::$app->user->id]);
+
+        return $this->render('index', [
+            'dataProvider' => $dataProvider,
+            'customer'     => $customer,
+        ]);
     }
 
     /**

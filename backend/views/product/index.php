@@ -32,7 +32,15 @@ $this->params['breadcrumbs'][] = $this->title;
                 ],
                 [
                     'attribute' => 'price',
+                    'label'     => 'Retail Price',
                     'value' => static fn (Product $m): string => '€ ' . number_format((float) $m->price, 2),
+                ],
+                [
+                    'attribute' => 'wholesale_price',
+                    'label'     => 'Wholesale Price',
+                    'value' => static fn (Product $m): string => $m->wholesale_price !== null
+                        ? '€ ' . number_format((float) $m->wholesale_price, 2)
+                        : '—',
                 ],
                 [
                     'attribute' => 'stock_quantity',

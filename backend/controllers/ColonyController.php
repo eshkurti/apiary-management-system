@@ -67,7 +67,7 @@ class ColonyController extends Controller
     {
         $dataProvider = new ActiveDataProvider([
             'query' => Colony::find()->with('apiaryStand')->orderBy(['colony_code' => SORT_ASC]),
-            'pagination' => ['pageSize' => 20],
+            'pagination' => ['pageSize' => 10],
         ]);
 
         return $this->render('index', ['dataProvider' => $dataProvider]);

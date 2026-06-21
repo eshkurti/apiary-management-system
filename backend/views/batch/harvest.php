@@ -49,6 +49,11 @@ $coloniesUrl = Url::to(['batch/colonies-for-stand']);
             Batch::honeyVarietyOptions(),
             ['prompt' => '— Select honey variety —'],
         ) ?>
+        <div id="custom-variety-wrap" style="display:none; margin-top: -0.75rem; margin-bottom: 1rem;">
+            <input type="text" id="custom-variety-input" class="form-control form-control-sm"
+                   placeholder="Specify variety…">
+            <div class="form-text">Enter the honey variety name.</div>
+        </div>
 
         <label class="form-label fw-semibold mt-2">Source colonies</label>
         <?php if ($model->hasErrors('harvest_date')): ?>
@@ -81,22 +86,15 @@ $js = <<<JS
     function render(rows) {
         \$wrap.empty();
         if (!rows.length) {
-            \$wrap.append('<div class="col-12 text-muted small">No active colonies are assigned to this stand.</div>');
+            \$wrap.append('<div class="col-12 text-muted small">No harvestable colonies on this stand (all may be in Wartezeit or carry a disease flag).</div>');
             return;
         }
         rows.forEach(function (c) {
             var checked = preselected.indexOf(parseInt(c.id, 10)) !== -1 ? 'checked' : '';
-            var badges = '';
-            if (c.in_withdrawal) {
-                badges += ' <span class="badge bg-warning text-dark">In withdrawal until ' + (c.withdrawal_until || '') + '</span>';
-            }
-            if (c.disease_flag) {
-                badges += ' <span class="badge bg-danger">Disease flag active</span>';
-            }
             var html =
                 '<div class="col-md-4 mb-1"><div class="form-check">' +
                 '<input class="form-check-input" type="checkbox" name="colony_ids[]" value="' + c.id + '" id="colony-' + c.id + '" ' + checked + '>' +
-                '<label class="form-check-label" for="colony-' + c.id + '">' + c.colony_code + badges + '</label>' +
+                '<label class="form-check-label" for="colony-' + c.id + '">' + c.colony_code + '</label>' +
                 '</div></div>';
             \$wrap.append(html);
         });
@@ -120,6 +118,30 @@ $js = <<<JS
     if (\$stand.val()) {
         load(\$stand.val());
     }
+
+    // "Other" honey variety: show/hide custom text field.
+    var \$variety    = $('#batch-honey_variety');
+    var \$customWrap = $('#custom-variety-wrap');
+    var \$customIn   = $('#custom-variety-input');
+
+    function syncVariety() {
+        if (\$variety.val() === 'Other') {
+            \$customWrap.show();
+        } else {
+            \$customWrap.hide();
+            \$customIn.val('');
+        }
+    }
+    \$variety.on('change', syncVariety);
+    syncVariety();
+
+    $('form').on('beforeSubmit', function () {
+        if (\$variety.val() === 'Other' && \$customIn.val().trim() !== '') {
+            \$variety.append($('<option>', {value: \$customIn.val().trim(), text: \$customIn.val().trim()}));
+            \$variety.val(\$customIn.val().trim());
+        }
+        return true;
+    });
 })();
 JS;
 $this->registerJs($js);

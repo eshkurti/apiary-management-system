@@ -3,6 +3,13 @@
 # Suite for acceptance tests.
 # Perform tests in browser using the WebDriver or PhpBrowser.
 # If you need both WebDriver and PHPBrowser tests - create a separate suite.
+#
+# NOTE: No acceptance tests are provided. PhpBrowser acceptance tests are
+# infeasible on the university VM: the VPN proxy restrictions there block the
+# loopback HTTP request PhpBrowser would have to make to the running app, so the
+# suite cannot reach http://localhost. All integration coverage is therefore in
+# the Functional suites, which exercise the application in-process without an
+# HTTP round-trip.
 actor: AcceptanceTester
 modules:
     enabled:

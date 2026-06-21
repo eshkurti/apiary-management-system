@@ -8,6 +8,10 @@ actor: FunctionalTester
 modules:
     enabled:
         - Filesystem
-        - Yii2
+        - Yii2:
+            # Wrap every test in a transaction and reload fixtures between
+            # tests so records created during a checkout test (orders, order
+            # items, stock changes) are rolled back and cannot leak forward.
+            cleanup: true
         - Asserts
         - frontend\tests\Support\Helper\Functional

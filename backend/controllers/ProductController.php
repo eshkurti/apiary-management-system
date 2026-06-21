@@ -51,7 +51,7 @@ class ProductController extends Controller
     {
         $dataProvider = new ActiveDataProvider([
             'query' => Product::find()->with('batch')->orderBy(['created_at' => SORT_DESC]),
-            'pagination' => ['pageSize' => 20],
+            'pagination' => ['pageSize' => 10],
         ]);
 
         return $this->render('index', ['dataProvider' => $dataProvider]);

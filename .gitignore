@@ -68,3 +68,6 @@ phpunit.phar
 
 # our shared hosting web root - copies of existing files
 /web/
+
+# requirements document
+/Lindenhof_Requirements_v2.docx

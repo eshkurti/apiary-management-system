@@ -46,6 +46,12 @@ $this->params['breadcrumbs'][] = $this->title;
                 'disease_indicators',
                 'notes:ntext',
                 [
+                    'label' => 'Feeding',
+                    'value' => $model->feeding_applied
+                        ? 'Yes' . ($model->feeding_quantity ? ' — ' . $model->feeding_quantity : '')
+                        : 'None',
+                ],
+                [
                     'label' => 'Inspector',
                     'value' => $model->inspector->username ?? '—',
                 ],

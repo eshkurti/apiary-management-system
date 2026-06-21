@@ -83,6 +83,14 @@ class SiteController extends Controller
 
         $model = new LoginForm();
         if ($model->load(Yii::$app->request->post()) && $model->login()) {
+            $user = Yii::$app->user;
+            if ($user->can('viewDashboard')) {
+                return $this->redirect(['/dashboard/index']);
+            }
+            if ($user->can('viewColonies')) {
+                return $this->redirect(['/colony/index']);
+            }
+
             return $this->goBack();
         }
 

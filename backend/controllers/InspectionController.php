@@ -47,7 +47,7 @@ class InspectionController extends Controller
     {
         $dataProvider = new ActiveDataProvider([
             'query' => Inspection::find()->with(['colony', 'apiaryStand'])->orderBy(['inspection_date' => SORT_DESC, 'id' => SORT_DESC]),
-            'pagination' => ['pageSize' => 20],
+            'pagination' => ['pageSize' => 10],
         ]);
 
         return $this->render('index', ['dataProvider' => $dataProvider]);

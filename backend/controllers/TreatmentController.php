@@ -63,7 +63,7 @@ class TreatmentController extends Controller
 
         $dataProvider = new ActiveDataProvider([
             'query' => $query,
-            'pagination' => ['pageSize' => 20],
+            'pagination' => ['pageSize' => 10],
         ]);
 
         return $this->render('index', [

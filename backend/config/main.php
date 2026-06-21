@@ -19,18 +19,18 @@ return [
             'csrfParam' => '_csrf-backend',
             'csrfCookie' => [
                 'httpOnly' => true,
-                'path' => '/',
+                'path' => '/admin',
             ],
         ],
         'user' => [
             'identityClass' => \common\models\User::class,
             'enableAutoLogin' => true,
-            'identityCookie' => ['name' => '_identity-backend', 'path' => '/', 'httpOnly' => true],
+            'identityCookie' => ['name' => '_identity-backend', 'path' => '/admin', 'httpOnly' => true],
         ],
         'session' => [
             'name' => 'advanced-backend',
             'cookieParams' => [
-                'path' => '/',
+                'path' => '/admin',
             ],
         ],
         'log' => [
@@ -55,4 +55,11 @@ return [
         */
     ],
     'params' => $params,
+    'container' => [
+        'definitions' => [
+            \yii\grid\GridView::class => [
+                'pager' => ['class' => \yii\bootstrap5\LinkPager::class],
+            ],
+        ],
+    ],
 ];

@@ -35,8 +35,10 @@ use yii\helpers\Html;
 
         <div class="row align-items-center">
             <div class="col-md-4"><?= $form->field($model, 'is_wholesale')->checkbox() ?></div>
-            <div class="col-md-4"><?= $form->field($model, 'min_order_quantity')->textInput()
-                ->hint('Required for wholesale; enforced at checkout (AC-EC-07.4).') ?></div>
+            <div class="col-md-4" id="moq-wrap" style="<?= $model->is_wholesale ? '' : 'display:none;' ?>">
+                <?= $form->field($model, 'min_order_quantity')->textInput()
+                    ->hint('Required for wholesale; enforced at checkout (AC-EC-07.4).') ?>
+            </div>
             <div class="col-md-4"><?= $form->field($model, 'is_active')->checkbox() ?></div>
         </div>
 
@@ -48,3 +50,20 @@ use yii\helpers\Html;
         <?php ActiveForm::end(); ?>
     </div>
 </div>
+<?php
+$this->registerJs(<<<JS
+(function () {
+    var \$cb  = $('#customer-is_wholesale');
+    var \$moq = $('#moq-wrap');
+    function sync() {
+        if (\$cb.is(':checked')) {
+            \$moq.show();
+        } else {
+            \$moq.hide();
+            \$moq.find('input').val('');
+        }
+    }
+    \$cb.on('change', sync);
+})();
+JS);
+?>

@@ -94,7 +94,7 @@ class ComplianceController extends Controller
                 ->with('apiaryStand')
                 ->where(['status' => $needsAttention])
                 ->orderBy(['harvest_date' => SORT_DESC, 'id' => SORT_DESC]),
-            'pagination' => ['pageSize' => 20],
+            'pagination' => ['pageSize' => 10],
         ]);
 
         $pendingCount = (int) Batch::find()->where(['status' => Batch::STATUS_PENDING_RELEASE])->count();

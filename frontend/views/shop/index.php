@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 /** @var yii\web\View $this */
 /** @var yii\data\ActiveDataProvider $dataProvider */
+/** @var common\models\Customer|null $customer */
 
 use common\models\Product;
 use yii\bootstrap5\LinkPager;
@@ -39,7 +40,12 @@ $products = $dataProvider->getModels();
                         <h2 class="h6 mb-1"><?= Html::encode($product->name) ?></h2>
                         <div class="text-muted small mb-2"><?= Html::encode($product->batch->honey_variety ?? '') ?></div>
                         <div class="d-flex justify-content-between align-items-center">
-                            <span class="price-tag">€ <?= number_format((float) $product->price, 2) ?></span>
+                            <?php $isWholesalePrice = $product->isWholesalePriceFor($customer) ?>
+                            <span class="price-tag">€ <?= number_format((float) $product->effectivePrice($customer), 2) ?>
+                                <?php if ($customer !== null && $customer->is_wholesale && !$isWholesalePrice): ?>
+                                    <small class="d-block text-muted fw-normal">Retail price</small>
+                                <?php endif ?>
+                            </span>
                             <span class="small text-muted"><?= (int) $product->stock_quantity ?> in stock</span>
                         </div>
                     </div>

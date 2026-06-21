@@ -49,8 +49,8 @@ class CustomerController extends Controller
     public function actionIndex(): string
     {
         $dataProvider = new ActiveDataProvider([
-            'query' => Customer::find()->orderBy(['name' => SORT_ASC]),
-            'pagination' => ['pageSize' => 20],
+            'query' => Customer::find()->with('user')->orderBy(['name' => SORT_ASC]),
+            'pagination' => ['pageSize' => 10],
         ]);
 
         return $this->render('index', ['dataProvider' => $dataProvider]);

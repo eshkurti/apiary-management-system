@@ -60,7 +60,7 @@ class BatchController extends Controller
     {
         $dataProvider = new ActiveDataProvider([
             'query' => Batch::find()->with('apiaryStand')->orderBy(['harvest_date' => SORT_DESC, 'id' => SORT_DESC]),
-            'pagination' => ['pageSize' => 20],
+            'pagination' => ['pageSize' => 10],
         ]);
 
         return $this->render('index', ['dataProvider' => $dataProvider]);
@@ -172,16 +172,18 @@ class BatchController extends Controller
             ->orderBy(['colony_code' => SORT_ASC])
             ->all();
 
-        $data = [];
+        $today = date('Y-m-d');
+        $data  = [];
         foreach ($colonies as $colony) {
-            $expiry = $colony->getLatestWartezeitExpiry();
+            // Colonies in active Wartezeit or carrying a disease flag cannot
+            // have their honey harvested — exclude them from the list entirely.
+            if (!$colony->isWithdrawalCleared() || $colony->disease_flag) {
+                continue;
+            }
             $data[] = [
-                'id'            => $colony->id,
-                'colony_code'   => $colony->colony_code,
-                'status'        => $colony->status,
-                'in_withdrawal' => !$colony->isWithdrawalCleared(),
-                'withdrawal_until' => $colony->isWithdrawalCleared() ? null : $expiry,
-                'disease_flag'  => (bool) $colony->disease_flag,
+                'id'          => $colony->id,
+                'colony_code' => $colony->colony_code,
+                'status'      => $colony->status,
             ];
         }
 

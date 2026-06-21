@@ -17,6 +17,11 @@ $containerList = array_combine($containerKeys, $containerKeys);
 if (!empty($model->container_size) && !isset($containerList[$model->container_size])) {
     $containerList = [$model->container_size => $model->container_size . ' (legacy)'] + $containerList;
 }
+
+// Honey variety: detect if the stored value is a custom (non-predefined) entry.
+$standardVarieties  = array_keys(Batch::honeyVarietyOptions());
+$isCustomVariety    = !empty($model->honey_variety) && !in_array($model->honey_variety, $standardVarieties, true);
+$customVarietyValue = $isCustomVariety ? $model->honey_variety : '';
 $currentGrams = Batch::containerSizeGrams($model->container_size) ?? '';
 $maxUnits     = $model->theoreticalMaxUnits(); // null until a container size is chosen
 ?>
@@ -25,10 +30,20 @@ $maxUnits     = $model->theoreticalMaxUnits(); // null until a container size is
         <?php $form = ActiveForm::begin(); ?>
 
         <div class="row">
-            <div class="col-md-6"><?= $form->field($model, 'honey_variety')->dropDownList(
-                Batch::honeyVarietyOptions(),
-                ['prompt' => '— Select honey variety —'],
-            )->hint('Determines the HonigV water-content limit (Heidehonig 23%, otherwise 20%).') ?></div>
+            <div class="col-md-6">
+                <?= $form->field($model, 'honey_variety')->dropDownList(
+                    Batch::honeyVarietyOptions(),
+                    [
+                        'prompt' => '— Select honey variety —',
+                        'value'  => $isCustomVariety ? 'Other' : $model->honey_variety,
+                    ],
+                )->hint('Determines the HonigV water-content limit (Heidehonig 23%, otherwise 20%).') ?>
+                <div id="custom-variety-wrap" style="<?= $isCustomVariety ? '' : 'display:none;' ?>margin-top: -0.5rem;">
+                    <input type="text" id="custom-variety-input" class="form-control form-control-sm"
+                           placeholder="Specify variety…" value="<?= Html::encode($customVarietyValue) ?>">
+                    <div class="form-text">Enter the honey variety name.</div>
+                </div>
+            </div>
             <div class="col-md-3"><?= $form->field($model, 'water_content')->textInput()
                 ->hint('<span id="water-limit-hint">HonigV limit: 20% (23% for Heidehonig)</span>', ['encode' => false]) ?></div>
             <div class="col-md-3"><?= $form->field($model, 'hmf')->textInput()
@@ -94,19 +109,38 @@ $js = <<<JS
         }
     });
 
-    // Water-content hint reflects the selected honey variety.
-    var \$variety = $('#batch-honey_variety');
-    var \$hint    = $('#water-limit-hint');
-    function syncWaterHint() {
+    // Water-content hint + "Other" custom field for honey variety.
+    var \$variety    = $('#batch-honey_variety');
+    var \$hint       = $('#water-limit-hint');
+    var \$customWrap = $('#custom-variety-wrap');
+    var \$customIn   = $('#custom-variety-input');
+
+    function syncVariety() {
         var v = \$variety.val();
+        if (v === 'Other') {
+            \$customWrap.show();
+        } else {
+            \$customWrap.hide();
+            \$customIn.val('');
+        }
         if (v && v.indexOf('Heidehonig') === 0) {
             \$hint.text('HonigV limit: 23% (Heidehonig)');
         } else {
             \$hint.text('HonigV limit: 20% (23% for Heidehonig)');
         }
     }
-    \$variety.on('change', syncWaterHint);
-    syncWaterHint();
+    \$variety.on('change', syncVariety);
+    syncVariety();
+
+    // Before submit: if "Other" is selected and custom field has a value,
+    // inject it as the actual honey_variety so the model stores the real name.
+    $('form').on('beforeSubmit', function () {
+        if (\$variety.val() === 'Other' && \$customIn.val().trim() !== '') {
+            \$variety.append($('<option>', {value: \$customIn.val().trim(), text: \$customIn.val().trim()}));
+            \$variety.val(\$customIn.val().trim());
+        }
+        return true;
+    });
 })();
 JS;
 $this->registerJs($js);

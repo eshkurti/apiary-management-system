@@ -48,7 +48,7 @@ class m260616_000003_seed_demo_data extends Migration
         // ── Company profile ───────────────────────────────────────────────
         $this->insert('{{%company_profile}}', [
             'company_name' => 'Honigmanufaktur Lindenhof',
-            'keeper_name'  => 'Klaus Müller',
+            'keeper_name'  => 'Jürgen Heym',
             'address'      => 'Lindenhofstraße 12',
             'postcode'     => '95028',
             'city'         => 'Hof',
@@ -171,8 +171,8 @@ class m260616_000003_seed_demo_data extends Migration
         // Colonies 7-8: Formic acid MAQS, still in withdrawal (applied June 2026)
         $treatments = [
             // Cleared — Wartezeit expired before May harvest
-            [$colonyIds['LIN-C-001'], $standIds['LIN-S-001'], 'varroa',       'Oxuvar 5.7%', 'OX-2026-001', '50 ml', 'Pharmabiene GmbH', 'Bienenstraße 1, 12345 Berlin', '2026-03-10', 2, 21, 10, 'Klaus Müller'],
-            [$colonyIds['LIN-C-002'], $standIds['LIN-S-001'], 'varroa',       'Oxuvar 5.7%', 'OX-2026-001', '50 ml', 'Pharmabiene GmbH', 'Bienenstraße 1, 12345 Berlin', '2026-03-10', 2, 21, 10, 'Klaus Müller'],
+            [$colonyIds['LIN-C-001'], $standIds['LIN-S-001'], 'varroa',       'Oxuvar 5.7%', 'OX-2026-001', '50 ml', 'Pharmabiene GmbH', 'Bienenstraße 1, 12345 Berlin', '2026-03-10', 2, 21, 10, 'Jürgen Heym'],
+            [$colonyIds['LIN-C-002'], $standIds['LIN-S-001'], 'varroa',       'Oxuvar 5.7%', 'OX-2026-001', '50 ml', 'Pharmabiene GmbH', 'Bienenstraße 1, 12345 Berlin', '2026-03-10', 2, 21, 10, 'Jürgen Heym'],
             [$colonyIds['LIN-C-003'], $standIds['LIN-S-002'], 'varroa',       'Oxuvar 5.7%', 'OX-2026-001', '50 ml', 'Pharmabiene GmbH', 'Bienenstraße 1, 12345 Berlin', '2026-03-15', 2, 21, 10, 'Hans Meier'],
             [$colonyIds['LIN-C-004'], $standIds['LIN-S-002'], 'varroa',       'Oxuvar 5.7%', 'OX-2026-001', '50 ml', 'Pharmabiene GmbH', 'Bienenstraße 1, 12345 Berlin', '2026-03-15', 2, 21, 10, 'Hans Meier'],
             [$colonyIds['LIN-C-005'], $standIds['LIN-S-003'], 'varroa',       'Oxuvar 5.7%', 'OX-2026-001', '50 ml', 'Pharmabiene GmbH', 'Bienenstraße 1, 12345 Berlin', '2026-03-20', 2, 21, 10, 'Lisa Bauer'],
