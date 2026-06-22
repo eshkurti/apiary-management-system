@@ -71,3 +71,5 @@ phpunit.phar
 
 # requirements document
 /Lindenhof_Requirements_v2.docx
+
+.claude/

@@ -51,15 +51,14 @@ final class SignupCest
         );
 
         $I->seeRecord(
-            User::class, 
+            User::class,
             [
                 'username' => 'tester',
                 'email' => 'tester.email@example.com',
-                'status' => User::STATUS_INACTIVE,
+                'status' => User::STATUS_ACTIVE,
             ],
         );
 
-        $I->seeEmailIsSent();
-        $I->see('Thank you for registration. Please check your inbox for verification email.');
+        $I->see('Registration successful. You can now log in.');
     }
 }

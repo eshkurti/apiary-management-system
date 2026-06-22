@@ -171,6 +171,16 @@ class SiteController extends Controller
     }
 
     /**
+     * Displays impressum page.
+     *
+     * @return string
+     */
+    public function actionImpressum(): string
+    {
+        return $this->render('impressum');
+    }
+
+    /**
      * Signs user up.
      *
      * @return string|Response
@@ -186,7 +196,7 @@ class SiteController extends Controller
         );
 
         if ($signed) {
-            Yii::$app->session->setFlash('success', 'Thank you for registration. Please check your inbox for verification email.');
+            Yii::$app->session->setFlash('success', 'Registration successful. You can now log in.');
             return $this->goHome();
         }
 
