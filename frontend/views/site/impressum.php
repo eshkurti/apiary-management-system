@@ -25,7 +25,7 @@ $this->params['meta_keywords'] = 'impressum, honigmanufaktur lindenhof, angaben 
 
             <h2 class="h6 fw-semibold mt-4 mb-2">Vertreten durch</h2>
             <p class="text-body-secondary mb-0">
-                Johann Lindner (Inhaber und Tierhalter)
+                Jürgen Heym (Inhaber und Tierhalter)
             </p>
 
             <h2 class="h6 fw-semibold mt-4 mb-2">Kontakt</h2>
@@ -46,7 +46,7 @@ $this->params['meta_keywords'] = 'impressum, honigmanufaktur lindenhof, angaben 
 
             <h2 class="h6 fw-semibold mt-4 mb-2">Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h2>
             <p class="text-body-secondary mb-0">
-                Johann Lindner, Lindenstraße 12, 95028 Hof (Saale)
+                Jürgen Heym, Lindenstraße 12, 95028 Hof (Saale)
             </p>
 
             <h2 class="h6 fw-semibold mt-4 mb-2">Haftungsausschluss</h2>
