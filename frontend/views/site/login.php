@@ -41,11 +41,6 @@ $this->params['breadcrumbs'][] = $this->title;
                 <div class="text-center mt-4 small">
                     New here? <?= Html::a('Create an account', ['site/signup']) ?>
                 </div>
-                <div class="text-center mt-2 small text-muted">
-                    <?= Html::a('Forgot your password?', ['site/request-password-reset']) ?>
-                    <span class="mx-1">&middot;</span>
-                    <?= Html::a('Resend verification email', ['site/resend-verification-email']) ?>
-                </div>
             </div>
         </div>
     </div>

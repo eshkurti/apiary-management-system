@@ -24,8 +24,8 @@ $this->params['breadcrumbs'][] = $this->title;
 
                 <?php $form = ActiveForm::begin(['id' => 'form-signup']); ?>
 
-                <?= $form->field($model, 'username')->textInput(['autofocus' => true, 'placeholder' => 'Your full name'])
-                    ->label('Full Name') ?>
+                <?= $form->field($model, 'username')->textInput(['autofocus' => true, 'placeholder' => 'Your username'])
+                    ->label('Username') ?>
 
                 <?= $form->field($model, 'email')->textInput(['placeholder' => 'email@example.com'])
                     ->label('Email') ?>

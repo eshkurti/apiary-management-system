@@ -71,7 +71,11 @@ $accountUrl = $user->isGuest ? Url::to(['/site/login']) : Url::to(['/account/ind
             <div class="fw-bold">Honigmanufaktur Lindenhof</div>
             <div class="tagline">Naturreiner Honig aus dem Landkreis Hof · Pure honey, fully traceable from hive to jar.</div>
         </div>
-        <div class="small">&copy; <?= date('Y') ?> Honigmanufaktur Lindenhof</div>
+        <div class="small">
+            <?= \yii\helpers\Html::a('Impressum', ['/site/impressum'], ['class' => 'text-decoration-none me-3']) ?>
+            <?= \yii\helpers\Html::a('About Us', ['/site/about'], ['class' => 'text-decoration-none me-3']) ?>
+            &copy; <?= date('Y') ?> Honigmanufaktur Lindenhof
+        </div>
     </div>
 </footer>
 

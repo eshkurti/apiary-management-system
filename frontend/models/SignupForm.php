@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace frontend\models;
 
+use common\models\Customer;
 use common\models\User;
 use Yii;
 use yii\base\Model;
@@ -58,12 +59,24 @@ class SignupForm extends Model
 
         $user->username = $this->username;
         $user->email = $this->email;
+        $user->status = User::STATUS_ACTIVE;
 
         $user->setPassword($this->password);
         $user->generateAuthKey();
-        $user->generateEmailVerificationToken();
 
-        return $user->save() && $this->sendEmail($mailer, $user, $supportEmail, $appName);
+        if (!$user->save()) {
+            return false;
+        }
+
+        $customer = new Customer();
+        $customer->user_id = $user->id;
+        $customer->name = $this->username;
+        $customer->email = $this->email;
+        $customer->country = 'Germany';
+        $customer->is_wholesale = 0;
+        $customer->is_active = 1;
+
+        return $customer->save();
     }
 
     /**
