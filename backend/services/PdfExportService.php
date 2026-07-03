@@ -478,7 +478,8 @@ class PdfExportService
             return '—';
         }
         if (!array_key_exists($userId, $this->usernameCache)) {
-            $user = User::findOne($userId);
+            // Read through the SELECT-only reporting connection (lindenhof_report).
+            $user = User::find()->where(['id' => $userId])->one($this->reportDb());
             $this->usernameCache[$userId] = $user->username ?? ('user #' . $userId);
         }
         return $this->usernameCache[$userId];
@@ -487,5 +488,16 @@ class PdfExportService
     private function e(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    /**
+     * Read-only reporting database connection (the lindenhof_report account —
+     * SELECT only). Defined only in the gitignored *-local.php config, exactly
+     * like the default `db` component, and referenced here purely by component
+     * name so the least-privilege reporting account is genuinely exercised.
+     */
+    private function reportDb(): \yii\db\Connection
+    {
+        return Yii::$app->get('db_report');
     }
 }

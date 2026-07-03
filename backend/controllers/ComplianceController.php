@@ -175,7 +175,12 @@ class ComplianceController extends Controller
      */
     private function bestandsbuchData(int $standId, string $dateFrom, string $dateTo): array
     {
-        $company   = CompanyProfile::getInstance();
+        $db = $this->reportDb();
+
+        // Single-row company profile, read through the reporting connection.
+        // Falls back to the in-memory default only when no row exists at all.
+        $company   = CompanyProfile::find()->orderBy(['id' => SORT_ASC])->one($db)
+            ?? CompanyProfile::getInstance();
         $allStands = $standId === 0;
         $stand     = null;
 
@@ -183,7 +188,7 @@ class ComplianceController extends Controller
             ->orderBy(['application_date' => SORT_ASC, 'id' => SORT_ASC]);
 
         if (!$allStands) {
-            $stand = ApiaryStand::findOne($standId);
+            $stand = ApiaryStand::find()->where(['id' => $standId])->one($db);
             if ($stand === null) {
                 throw new NotFoundHttpException('The selected apiary stand does not exist.');
             }
@@ -197,7 +202,7 @@ class ComplianceController extends Controller
             $query->andWhere(['<=', 'application_date', $dateTo]);
         }
         /** @var Treatment[] $treatments */
-        $treatments = $query->with(['colony', 'apiaryStand'])->all();
+        $treatments = $query->with(['colony', 'apiaryStand'])->all($db);
 
         return [$stand, $company, $treatments];
     }
@@ -302,7 +307,7 @@ class ComplianceController extends Controller
 
     private function exportStockkarte(int $colonyId, string $format): Response
     {
-        $colony = Colony::findOne($colonyId);
+        $colony = Colony::find()->where(['id' => $colonyId])->one($this->reportDb());
         if ($colony === null) {
             throw new NotFoundHttpException('The selected colony does not exist.');
         }
@@ -326,7 +331,9 @@ class ComplianceController extends Controller
      */
     private function exportStockkarteForStand(int $standId, string $format): Response
     {
-        $stand = ApiaryStand::findOne($standId);
+        $db = $this->reportDb();
+
+        $stand = ApiaryStand::find()->where(['id' => $standId])->one($db);
         if ($stand === null) {
             throw new NotFoundHttpException('The selected apiary stand does not exist.');
         }
@@ -336,7 +343,7 @@ class ComplianceController extends Controller
             ->where(['apiary_stand_id' => $standId])
             ->with('apiaryStand')
             ->orderBy(['colony_code' => SORT_ASC])
-            ->all();
+            ->all($db);
 
         if ($format === 'pdf') {
             $pdf = (new PdfExportService())->stockkarteForStand($stand, $colonies);
@@ -508,16 +515,18 @@ class ComplianceController extends Controller
 
         if ($term !== '') {
             $searched = true;
+            $db = $this->reportDb();
 
             if ($searchType === 'colony') {
-                $colony = Colony::find()->where(['colony_code' => $term])->one();
+                $colony = Colony::find()->where(['colony_code' => $term])->one($db);
                 if ($colony === null) {
                     $notFound = true;
                 } else {
-                    $batches = $colony->batches; // every batch sourced from this colony (AC-CO-06.1)
+                    // Relation read routed explicitly through the reporting connection.
+                    $batches = $colony->getBatches()->all($db); // every batch sourced from this colony (AC-CO-06.1)
                 }
             } else {
-                $batch = Batch::find()->where(['lot_number' => $term])->one();
+                $batch = Batch::find()->where(['lot_number' => $term])->one($db);
                 if ($batch === null) {
                     $notFound = true;
                 } else {
@@ -559,7 +568,7 @@ class ComplianceController extends Controller
         $items = OrderItem::find()
             ->where(['lot_number' => $lotNumbers])
             ->with(['order', 'order.customer'])
-            ->all();
+            ->all($this->reportDb());
 
         $rows = [];
         foreach ($items as $item) {
@@ -590,10 +599,23 @@ class ComplianceController extends Controller
         }
         static $cache = [];
         if (!array_key_exists($userId, $cache)) {
-            $user = User::findOne($userId);
+            // Read through the SELECT-only reporting connection (lindenhof_report).
+            $user = User::find()->where(['id' => $userId])->one($this->reportDb());
             $cache[$userId] = $user->username ?? ('user #' . $userId);
         }
         return $cache[$userId];
+    }
+
+    /**
+     * Read-only reporting database connection (the lindenhof_report account —
+     * SELECT only). Defined only in the gitignored *-local.php config, exactly
+     * like the default `db` component, and referenced here purely by component
+     * name so the least-privilege reporting account is genuinely used for the
+     * Bestandsbuch, Stockkarte and recall-trace read paths.
+     */
+    private function reportDb(): \yii\db\Connection
+    {
+        return Yii::$app->get('db_report');
     }
 
     /**
