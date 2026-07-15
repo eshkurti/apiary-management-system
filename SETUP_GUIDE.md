@@ -65,11 +65,16 @@ You now have a runnable skeleton. Next, point it at a database.
 
 ### 3.1 Create the database and a dedicated user
 
-Run the bundled setup script once, as root:
+Run the bundled setup script once, as root. **PowerShell does not support `<`
+for input redirection** (it's a reserved-but-unimplemented operator — this was
+hit and confirmed directly), so pipe the file in instead:
 
 ```powershell
-mysql -u root -p < local-db-setup.sql
+Get-Content local-db-setup.sql | mysql -u root -p
 ```
+
+In CMD or Git Bash, the more familiar `mysql -u root -p < local-db-setup.sql`
+works as expected.
 
 This creates the `apiary` database and an `apiary` MariaDB user with broad
 privileges (not just scoped to `apiary`.*). The broad grant is deliberate —
@@ -80,6 +85,16 @@ or run it by hand, open the file; it's four short SQL statements.
 > Yii does **not** create the database for you — it must exist before you run
 > migrations. Using `utf8mb4` matters: the data contains German text
 > (`Blütenhonig`, `Veterinäramt`, `§§`).
+
+> **Starting over / re-running this script:** `local-db-setup.sql` uses
+> `CREATE DATABASE IF NOT EXISTS` and `CREATE USER IF NOT EXISTS`, so it's
+> safe to re-run without erroring — but that also means it will **not** reset
+> an existing `apiary` database. If you want a genuinely clean slate (e.g.
+> testing the whole setup flow again from scratch), drop it first:
+> ```powershell
+> mysql -u root -p -e "DROP DATABASE IF EXISTS apiary;"
+> ```
+> then run the setup script again before `php yii migrate`.
 
 ### 3.2 Database connection — no editing needed
 
