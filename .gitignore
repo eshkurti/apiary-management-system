@@ -23,9 +23,8 @@ Thumbs.db
 # composer vendor dir
 /vendor
 
-# composer itself is not needed
+# composer itself is not needed (composer.lock IS committed, for reproducible installs)
 composer.phar
-composer.lock
 
 # Mac DS_Store Files
 .DS_Store
@@ -70,6 +69,4 @@ phpunit.phar
 /web/
 
 # requirements document
-/Lindenhof_Requirements_v2.docx
-
-.claude/
+/Lin
