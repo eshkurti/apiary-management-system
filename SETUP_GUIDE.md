@@ -168,69 +168,43 @@ Answer `yes` to apply all of them. In order, they:
 7. `m260617_*` / `m260618_*` — the `treatment_product` reference table,
    wholesale pricing, inspection feeding, treatment receipt/vet fields, batch
    review note, and product review-unpublish flag
+8. `m260621_000001_seed_demo_users` — seeds one demo account per non-admin RBAC
+   role (`headBeekeeper`, `fieldBeekeeper`, `customer`), plus the linked CRM
+   `Customer` record for the customer account
+9. `m260621_000002_clean_demo_customers` / `m260621_000004_seed_demo_orders` /
+   `m260621_000005_fix_tierhalter_name` — demo data cleanup and the sample
+   order set
+10. `m260703_000001_create_database_accounts` — creates the three least-privilege
+    MariaDB accounts described under **Database access model** in the README
 
-After this completes, the schema and seed data are in place — but you still
-cannot log in to the backend, because there is no admin **account** yet.
+After this completes, the schema, reference data, and demo accounts are all in
+place — **you can log in immediately, no manual account creation needed.**
 
 ---
 
-## 5. Create an initial administrator account
+## 5. Log in
 
-There is **no registration UI for backend staff accounts** — backend users are
-created directly in the database. This is the same way the original `eshkurti`
-account (user id 1) was created, and the RBAC seed in Step 4 has already
-assigned the `administrator` role to **user id 1**. So if you create your admin
-as the *first* row in the `user` table, it is an administrator automatically.
+Two migrations (`m260614_000002_seed_admin_user` and `m260621_000001_seed_demo_users`)
+already seeded four working accounts, all sharing one demo password:
 
-### 5.1 Generate a password hash and an auth key
+| Username         | Role            | Password      |
+|-------------------|-----------------|---------------|
+| `admin`           | administrator   | `COSD@groupb` |
+| `headBeekeeper`   | headBeekeeper   | `COSD@groupb` |
+| `fieldBeekeeper`  | fieldBeekeeper  | `COSD@groupb` |
+| `customer`        | customer        | `COSD@groupb` |
 
-The app hashes passwords with bcrypt (Yii's `generatePasswordHash`, cost 13) and
-stores a 32-character `auth_key`. Generate both with PHP:
+Log in to the backend (Step 6 below) with `admin` / `COSD@groupb` and you're an
+administrator immediately — no SQL, no password hashing, nothing to hand-create.
 
-```powershell
-php -r "echo password_hash('ChangeMe!123', PASSWORD_BCRYPT, ['cost' => 13]), PHP_EOL;"
-php -r "echo bin2hex(random_bytes(16)), PHP_EOL;"
-```
-
-The first command prints a `$2y$13$...` hash (copy it whole — it contains `$`
-characters). The second prints a 32-character key that fits the `auth_key`
-column exactly.
-
-### 5.2 Insert the account
-
-In the MariaDB shell (`mysql -u apiary -p apiary`), paste your generated values:
-
-```sql
-INSERT INTO `user`
-    (`username`, `auth_key`, `password_hash`, `email`, `status`, `created_at`, `updated_at`)
-VALUES
-    ('eshkurti',
-     'PASTE_THE_32_CHAR_AUTH_KEY_HERE',
-     'PASTE_THE_$2y$13$_HASH_HERE',
-     'admin@lindenhof.local',
-     10,                       -- 10 = STATUS_ACTIVE
-     UNIX_TIMESTAMP(),
-     UNIX_TIMESTAMP());
-```
-
-Because this is the first user, it receives **id 1**, and the RBAC seed has
-already granted it `administrator`. Verify:
-
-```sql
-SELECT u.id, u.username, a.item_name
-FROM `user` u
-LEFT JOIN `auth_assignment` a ON a.user_id = u.id
-WHERE u.username = 'eshkurti';
-```
-
-You should see `item_name = administrator`.
-
-> **If your account did not get id 1** (e.g. you are adding a second admin),
-> grant the role explicitly:
+> **Creating an additional account beyond the seeded four:** the RBAC seed
+> hard-assigns the `administrator` role to **user id 1**, so on a clean install
+> the first admin migration claims that automatically. To grant a role to a
+> further account you create later, assign it directly:
 >
 > ```sql
 > INSERT INTO `auth_assignment` (`item_name`, `user_id`, `created_at`)
-> VALUES ('administrator', '<the_new_user_id>', UNIX_TIMESTAMP());
+> VALUES ('administrator', '<the_user_id>', UNIX_TIMESTAMP());
 > ```
 >
 > The other roles work the same way — use `headBeekeeper`, `fieldBeekeeper`, or
@@ -316,8 +290,8 @@ inspections, **8 treatments**, **2 batches** (`LIN-2026-001` released,
 `LIN-2026-002` pending), **1 published product**, **3 customers**, and
 **2 orders**. Click through these to confirm everything works:
 
-1. **Backend login** — go to http://127.0.0.1:8081, log in as `eshkurti` with
-   the password from Step 5. You should land on the operations dashboard showing
+1. **Backend login** — go to http://127.0.0.1:8081, log in as `admin` with
+   the password from Step 5 (`COSD@groupb`). You should land on the operations dashboard showing
    open orders, low-stock alerts, colonies in Wartezeit, and pending batches.
 2. **Colony Stockkarte** — Production Management → Colonies → open
    **`LIN-C-007`** → Stockkarte. It should show an **active withdrawal period**
