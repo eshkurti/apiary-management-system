@@ -65,60 +65,34 @@ You now have a runnable skeleton. Next, point it at a database.
 
 ### 3.1 Create the database and a dedicated user
 
-Open a MariaDB shell as root:
+Run the bundled setup script once, as root:
 
 ```powershell
-mysql -u root -p
+mysql -u root -p < local-db-setup.sql
 ```
 
-Then run (adjust the password to taste):
-
-```sql
-CREATE DATABASE apiary CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-CREATE USER 'apiary'@'localhost' IDENTIFIED BY 'apiary_secret';
-GRANT ALL PRIVILEGES ON apiary.* TO 'apiary'@'localhost';
-FLUSH PRIVILEGES;
-```
+This creates the `apiary` database and an `apiary` MariaDB user with broad
+privileges (not just scoped to `apiary`.*). The broad grant is deliberate —
+see the comment at the top of `local-db-setup.sql` and Step 4 below for why a
+database-scoped grant isn't enough. If you'd rather see exactly what it does
+or run it by hand, open the file; it's four short SQL statements.
 
 > Yii does **not** create the database for you — it must exist before you run
 > migrations. Using `utf8mb4` matters: the data contains German text
 > (`Blütenhonig`, `Veterinäramt`, `§§`).
 
-### 3.2 Configure the database connection
+### 3.2 Database connection — no editing needed
 
-Edit **`common/config/main-local.php`** (generated in Step 2) so the `db`
-component matches the user you just created:
+`common/config/main-local.php` (generated in Step 2) already defaults to the
+exact `apiary`/`apiary_secret` credentials `local-db-setup.sql` creates, via
+the `environments/dev/common/config/main-local.php` template — so as long as
+you ran the script in 3.1 with the default database/user names, there's
+nothing to edit here. Only touch this file if you changed the database name,
+username, or password in `local-db-setup.sql` first.
 
-```php
-<?php
-return [
-    'container' => [
-        'singletons' => [
-            \yii\mail\MailerInterface::class => [
-                'class' => \yii\symfonymailer\Mailer::class,
-                'viewPath' => '@common/mail',
-                // Dev: write all outgoing mail to runtime/mail instead of sending.
-                'useFileTransport' => true,
-            ],
-        ],
-    ],
-    'components' => [
-        'db' => [
-            'class'    => \yii\db\Connection::class,
-            'dsn'      => 'mysql:host=localhost;dbname=apiary',
-            'username' => 'apiary',
-            'password' => 'apiary_secret',
-            'charset'  => 'utf8mb4',
-        ],
-        'mailer' => \yii\mail\MailerInterface::class,
-    ],
-];
-```
-
-Leaving `useFileTransport` set to `true` means account-verification and other
-emails are written to `common/runtime/mail/*.eml` instead of being sent — which
-is what you want for local development.
+Mail is already configured with `useFileTransport => true`, so account
+verification and other emails are written to `common/runtime/mail/*.eml`
+instead of being sent — what you want for local development.
 
 > The `authManager` is already configured as `yii\rbac\DbManager` in the shared
 > `common/config/main.php`, so RBAC reads its roles and permissions from the

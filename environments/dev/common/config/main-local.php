@@ -38,10 +38,12 @@ return [
     'components' => [
         'db' => [
             'class' => \yii\db\Connection::class,
-            'dsn' => 'mysql:host=localhost;dbname=yii2advanced',
-            'username' => 'root',
-            'password' => '',
-            'charset' => 'utf8',
+            // Matches local-db-setup.sql — run that script once as root before
+            // the first `php yii migrate` and this needs no editing at all.
+            'dsn' => 'mysql:host=localhost;dbname=apiary',
+            'username' => 'apiary',
+            'password' => 'apiary_secret',
+            'charset' => 'utf8mb4',
         ],
         'mailer' => \yii\mail\MailerInterface::class,
     ],
