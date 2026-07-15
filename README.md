@@ -57,10 +57,9 @@ composer install
 php init --env=Development --overwrite=All
 ```
 
-Create a MariaDB database, point `common/config/main-local.php` at it, then run migrations in two passes — Yii's own RBAC framework tables have to exist before the project's RBAC seed migration can write to them:
+Create a MariaDB database, point `common/config/main-local.php` at it, then:
 
 ```bash
-php yii migrate --migrationPath=@yii/rbac/migrations
 php yii migrate
 ```
 

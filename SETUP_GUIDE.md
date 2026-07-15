@@ -127,33 +127,33 @@ is what you want for local development.
 
 ---
 
-## 4. Run the migrations (RBAC framework migrations **first**)
+## 4. Run the migrations
 
-There are **two** migration sets, and the order is not optional.
-
-### 4.1 Yii's RBAC framework migrations — run these first
-
-The project migrations seed roles and permissions through the database-backed
-`authManager`. That requires the RBAC tables (`auth_item`, `auth_item_child`,
-`auth_assignment`, `auth_rule`) to already exist. Create them with Yii's own
-RBAC migrations:
-
-```powershell
-php yii migrate --migrationPath=@yii/rbac/migrations
-```
-
-Answer `yes` when prompted. If you skip this step, the project's RBAC seed
-migration fails because `authManager` has no tables to write to.
-
-### 4.2 The project migrations
-
-Now run the application migrations from `console/migrations/`:
+Run the application migrations from `console/migrations/` — this is a single
+step:
 
 ```powershell
 php yii migrate
 ```
 
-Answer `yes` to apply all of them. In order, they:
+Answer `yes` to apply all of them.
+
+> **Do not run `php yii migrate --migrationPath=@yii/rbac/migrations` first.**
+> Older notes about this project (including an earlier version of this file)
+> said to run Yii's own RBAC framework migration before the project
+> migrations, on the theory that `authManager` needs its tables to exist
+> first. That's no longer correct: the project's own first migration,
+> `m260614_000001_create_rbac_tables`, already creates those exact tables
+> itself — its docblock says so explicitly ("inlines that step so a single
+> `php yii migrate` bootstraps the entire application from scratch"). Running
+> the framework migration first creates the RBAC tables early, and then the
+> project's own migration fails with `Base table or view already exists:
+> auth_rule`, which cancels every migration after it — you'd end up with only
+> 2 of 20 migrations applied and a completely broken install. This was
+> confirmed by actually running both orders: the two-step order fails at
+> migration 3; a single `php yii migrate` applies all 20 cleanly.
+
+Migrations run in order:
 
 1. `m130524_201442_init` — create the `user` table
 2. `m190124_110200_*` — add the email verification column
